@@ -2,7 +2,7 @@
 "use client";
 
 import React from "react";
-import { User, Bot } from "lucide-react";
+import { User, Bot, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import TypewriterEffect from "@/components/typewriter-effect";
@@ -41,14 +41,15 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
         className={cn(
           "max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl shadow-md rounded-xl",
           isUser ? "bg-primary text-primary-foreground" : "bg-card",
-          !isUser && message.isThinkingPlaceholder && "animate-bubble-pulse"
         )}
       >
         <CardContent className="p-3 text-sm break-words">
           {isUser ? (
             message.content
           ) : message.isThinkingPlaceholder ? (
-            message.content
+            <div className="flex justify-center items-center h-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
           ) : (
             <TypewriterEffect text={message.content} speed={typingSpeed} />
           )}

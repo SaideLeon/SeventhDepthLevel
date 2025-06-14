@@ -81,7 +81,7 @@ export default function ChatInterface() {
     const thinkingMessage: Message = {
       id: assistantMessageId,
       role: "assistant",
-      content: "Estou pensando na resposta...",
+      content: "", // Content is empty as spinner will be shown
       isThinkingPlaceholder: true,
     };
 
