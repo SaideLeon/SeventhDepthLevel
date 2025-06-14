@@ -51,12 +51,14 @@ When generating the text, please follow these steps meticulously:
     b.  **Alt Text**: Use the image's original caption (available from the \`imageInfo\` string, typically in "alt text (URL)" format) as the alt text in the Markdown.
     c.  **URL Formatting - ABSOLUTELY CRITICAL**: For ALL images, you **MUST** ensure that no URL parameters (like '?width=50&blur=10', '?size=small', etc.) are included in the image source URL within the Markdown. ALWAYS use only the base image URL. For example, if the context provides an image as 'https://static.todamateria.com.br/upload/fo/to/fotossistemas.jpg?width=50&blur=10', you MUST render it in Markdown as '![alt text](https://static.todamateria.com.br/upload/fo/to/fotossistemas.jpg)'. This rule applies to all images, including those from a technical sheet (ficha técnica) or any other source mentioned in the context.
 4.  **Citation Style - CRITICAL INSTRUCTION: YOU MUST PRIORITIZE NARRATIVE CITATIONS.**
-    When citing sources, you **MUST** primarily use a **narrative style**, integrating the author's name directly into the sentence.
+    When citing sources, you **MUST** primarily use a **narrative style**, integrating the author's name directly into the sentence using phrases like "Segundo Autor (data)...", "De acordo com Autor (data)...", "Autor (data) afirma que...", "Autor (data) explica que...".
     **Example of the PREFERRED Narrative Style:**
     *   \`Segundo Castilho (s.d.), no ciclo rápido, o carbono move-se rapidamente...\`
-    *   \`De acordo com Castilho (s.d.), este ciclo envolve...\`
+    *   \`De acordo com Batista (s.d.), a fotossíntese transforma a energia luminosa...\`
+    *   \`Pinto (2008) explica que a nova reforma só surgirá em 1982...\`
     **AVOID this parenthetical style for paraphrases and short quotes:**
     *   \`No ciclo rápido, o carbono move-se rapidamente... (Castilho, s.d.).\`
+    *   \`A fotossíntese transforma a energia luminosa... (Batista, s.d.).\`
 
     While adhering to the American Psychological Association (APA) 7th edition guidelines (author-date system, page numbers for direct quotes), your default approach for all paraphrases and short direct quotes **MUST BE NARRATIVE.**
     *   **Indirect Citation / Paraphrasing (MUST BE NARRATIVE):** Example: \`Pinto (2008) discute como a nova reforma...\` or \`Segundo Pinto (2008), a nova reforma... (p. 29).\` (If page number is relevant for the paraphrase).
