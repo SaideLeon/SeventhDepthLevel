@@ -216,7 +216,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
           </AvatarFallback>
         </Avatar>
       )}
-      <div className="flex flex-col w-full">
+      <div className="flex flex-col"> {/* Removido w-full daqui */}
         <Card
           className={cn(
             "max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl shadow-md rounded-xl",
@@ -250,4 +250,3 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
     </div>
   );
 }
-
