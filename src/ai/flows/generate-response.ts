@@ -13,6 +13,8 @@ import {z} from 'genkit';
 
 const GenerateResponseInputSchema = z.object({
   prompt: z.string().describe('The prompt to send to the AI.'),
+  persona: z.string().optional().describe('The persona the AI should adopt.'),
+  rules: z.string().optional().describe('Specific rules the AI should follow when responding.'),
 });
 export type GenerateResponseInput = z.infer<typeof GenerateResponseInputSchema>;
 
@@ -29,7 +31,15 @@ const generateResponsePrompt = ai.definePrompt({
   name: 'generateResponsePrompt',
   input: {schema: GenerateResponseInputSchema},
   output: {schema: GenerateResponseOutputSchema},
-  prompt: `{{prompt}}`,
+  prompt: `{{#if persona}}You are acting as: {{persona}}.{{/if}}
+
+{{#if rules}}
+Please follow these rules when responding:
+{{rules}}
+---
+{{/if}}
+
+{{prompt}}`,
 });
 
 const generateResponseFlow = ai.defineFlow(

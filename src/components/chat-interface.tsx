@@ -18,25 +18,41 @@ interface Message {
 }
 
 const TYPING_SPEED_STORAGE_KEY = "typewriterai_typing_speed";
+const AI_PERSONA_STORAGE_KEY = "typewriterai_persona";
+const AI_RULES_STORAGE_KEY = "typewriterai_rules";
 
 export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [typingSpeed, setTypingSpeed] = useState<number>(50); // Default speed in ms per character
+  const [typingSpeed, setTypingSpeed] = useState<number>(50);
+  const [aiPersona, setAiPersona] = useState<string>("");
+  const [aiRules, setAiRules] = useState<string>("");
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     const storedSpeed = localStorage.getItem(TYPING_SPEED_STORAGE_KEY);
-    if (storedSpeed) {
-      setTypingSpeed(Number(storedSpeed));
-    }
+    if (storedSpeed) setTypingSpeed(Number(storedSpeed));
+
+    const storedPersona = localStorage.getItem(AI_PERSONA_STORAGE_KEY);
+    if (storedPersona) setAiPersona(storedPersona);
+
+    const storedRules = localStorage.getItem(AI_RULES_STORAGE_KEY);
+    if (storedRules) setAiRules(storedRules);
   }, []);
 
   useEffect(() => {
     localStorage.setItem(TYPING_SPEED_STORAGE_KEY, typingSpeed.toString());
   }, [typingSpeed]);
+
+  useEffect(() => {
+    localStorage.setItem(AI_PERSONA_STORAGE_KEY, aiPersona);
+  }, [aiPersona]);
+
+  useEffect(() => {
+    localStorage.setItem(AI_RULES_STORAGE_KEY, aiRules);
+  }, [aiRules]);
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -58,9 +74,13 @@ export default function ChatInterface() {
     setIsLoading(true);
 
     try {
-      const aiResult: GenerateResponseOutput = await generateResponse({ prompt: userMessage.content });
+      const aiResult: GenerateResponseOutput = await generateResponse({
+        prompt: userMessage.content,
+        persona: aiPersona || undefined, // Send undefined if empty
+        rules: aiRules || undefined,     // Send undefined if empty
+      });
       const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(), // Ensure unique ID
+        id: (Date.now() + 1).toString(),
         role: "assistant",
         content: aiResult.response,
       };
@@ -72,8 +92,6 @@ export default function ChatInterface() {
         description: "Failed to get a response from the AI. Please try again.",
         variant: "destructive",
       });
-      // Optionally add the error message back to input or as a system message
-      // setMessages((prev) => [...prev, {id: Date.now().toString(), role: 'assistant', content: "Sorry, I couldn't process that."}]);
     } finally {
       setIsLoading(false);
     }
@@ -83,16 +101,19 @@ export default function ChatInterface() {
     setMessages([]);
   };
 
-  const handleSpeedChange = (newSpeed: number) => {
-    setTypingSpeed(newSpeed);
-  };
-
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
       <header className="p-4 border-b flex justify-between items-center shadow-sm sticky top-0 bg-background z-10">
         <h1 className="text-2xl font-headline font-semibold text-primary">TypewriterAI</h1>
         <div className="flex items-center gap-2">
-          <SettingsPopover currentSpeed={typingSpeed} onSpeedChange={handleSpeedChange}>
+          <SettingsPopover
+            currentSpeed={typingSpeed}
+            onSpeedChange={setTypingSpeed}
+            currentPersona={aiPersona}
+            onPersonaChange={setAiPersona}
+            currentRules={aiRules}
+            onRulesChange={setAiRules}
+          >
             <Button variant="ghost" size="icon" aria-label="Settings">
               <Settings className="h-5 w-5 text-muted-foreground hover:text-accent" />
             </Button>
@@ -120,6 +141,7 @@ export default function ChatInterface() {
             disabled={isLoading}
             className="flex-1 rounded-full px-4 py-2 focus-visible:ring-primary"
             aria-label="Message input"
+            spellCheck={false}
           />
           <Button type="submit" disabled={isLoading || !inputValue.trim()} size="icon" className="rounded-full bg-primary hover:bg-primary/90 disabled:bg-muted" aria-label="Send message">
             {isLoading ? (
