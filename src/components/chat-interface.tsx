@@ -16,6 +16,7 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  isThinkingPlaceholder?: boolean;
 }
 
 const TYPING_SPEED_STORAGE_KEY = "typewriterai_typing_speed";
@@ -81,6 +82,7 @@ export default function ChatInterface() {
       id: assistantMessageId,
       role: "assistant",
       content: "Estou pensando na resposta...",
+      isThinkingPlaceholder: true,
     };
 
     setMessages((prev) => [...prev, userMessage, thinkingMessage]);
@@ -95,7 +97,7 @@ export default function ChatInterface() {
       setMessages((prevMessages) =>
         prevMessages.map((msg) =>
           msg.id === assistantMessageId
-            ? { ...msg, content: aiResult.response }
+            ? { ...msg, content: aiResult.response, isThinkingPlaceholder: false }
             : msg
         )
       );
@@ -109,7 +111,7 @@ export default function ChatInterface() {
       setMessages((prevMessages) =>
         prevMessages.map((msg) =>
           msg.id === assistantMessageId
-            ? { ...msg, content: "Desculpe, não consegui processar sua solicitação." }
+            ? { ...msg, content: "Desculpe, não consegui processar sua solicitação.", isThinkingPlaceholder: false }
             : msg
         )
       );

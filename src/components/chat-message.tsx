@@ -1,8 +1,9 @@
+
 "use client";
 
 import React from "react";
 import { User, Bot } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import TypewriterEffect from "@/components/typewriter-effect";
 import { cn } from "@/lib/utils";
@@ -11,6 +12,7 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  isThinkingPlaceholder?: boolean;
 }
 
 interface ChatMessageProps {
@@ -38,11 +40,14 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
       <Card
         className={cn(
           "max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl shadow-md rounded-xl",
-          isUser ? "bg-primary text-primary-foreground" : "bg-card"
+          isUser ? "bg-primary text-primary-foreground" : "bg-card",
+          !isUser && message.isThinkingPlaceholder && "animate-pulse"
         )}
       >
         <CardContent className="p-3 text-sm break-words">
           {isUser ? (
+            message.content
+          ) : message.isThinkingPlaceholder ? (
             message.content
           ) : (
             <TypewriterEffect text={message.content} speed={typingSpeed} />
