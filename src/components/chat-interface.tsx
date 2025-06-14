@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { SendHorizontal, Loader2, Trash2, Settings } from "lucide-react";
 import ChatMessage from "@/components/chat-message";
 import SettingsPopover from "@/components/settings-popover";
+import ThemeToggleButton from "./theme-toggle-button";
 import { generateResponse, type GenerateResponseOutput } from "@/ai/flows/generate-response";
 import { useToast } from "@/hooks/use-toast";
 
@@ -32,7 +33,7 @@ export default function ChatInterface() {
   const [aiPersona, setAiPersona] = useState<string>("");
   const [aiRules, setAiRules] = useState<string>("");
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const formRef = useRef<HTMLFormElement>(null); // Ref for the form
+  const formRef = useRef<HTMLFormElement>(null); 
   const { toast } = useToast();
 
   useEffect(() => {
@@ -64,12 +65,12 @@ export default function ChatInterface() {
     }
   }, [messages]);
 
-  const handleSendMessage = async (e?: FormEvent) => { // Make e optional for programmatic submit
+  const handleSendMessage = async (e?: FormEvent) => { 
     if (e) e.preventDefault();
     if (!inputValue.trim() || isLoading) return;
 
     const userMessageContent = inputValue.trim();
-    setInputValue(""); // Clear input after sending
+    setInputValue(""); 
     setIsLoading(true);
 
     const userMessage: Message = {
@@ -83,7 +84,7 @@ export default function ChatInterface() {
     const thinkingMessage: Message = {
       id: assistantMessageId,
       role: "assistant",
-      content: "",
+      content: "", 
       isThinkingPlaceholder: true,
       startTime: Date.now(),
     };
@@ -129,14 +130,11 @@ export default function ChatInterface() {
 
   const handleInputKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault(); // Prevent newline in textarea
+      event.preventDefault(); 
       if (!isLoading && inputValue.trim()) {
-         // Programmatically submit the form if using formRef.current.requestSubmit()
-         // Or call handleSendMessage directly if it doesn't rely on form event
          handleSendMessage();
       }
     }
-    // Shift+Enter will naturally create a newline in a textarea
   };
 
 
@@ -145,6 +143,7 @@ export default function ChatInterface() {
       <header className="p-4 border-b flex justify-between items-center shadow-sm sticky top-0 bg-background z-10">
         <h1 className="text-2xl font-headline font-semibold text-primary">TypewriterAI</h1>
         <div className="flex items-center gap-2">
+          <ThemeToggleButton />
           <SettingsPopover
             currentSpeed={typingSpeed}
             onSpeedChange={setTypingSpeed}
