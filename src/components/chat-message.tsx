@@ -101,12 +101,19 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
           components={{
             pre: ({ node, ...props }) => {
               const codeNode = props.children?.[0] as React.ReactElement;
-              if (codeNode && codeNode.type === 'code' && codeNode.props.className) {
-                const language = codeNode.props.className.replace('language-', '');
-                const codeString = String(codeNode.props.children).replace(/\n$/, '');
+              let codeString = "";
+              let language = "plaintext";
+              if (codeNode && codeNode.type === 'code') {
+                if (codeNode.props.className) {
+                  language = codeNode.props.className.replace('language-', '');
+                }
+                codeString = String(codeNode.props.children).replace(/\n$/, '');
                 return <VSCodeCodeBlock language={language} code={codeString} />;
               }
-              return <pre {...props} />;
+              // Fallback for pre tags that don't directly contain a code tag with className
+              // This might happen with complex/nested markdown structures or plain pre tags
+              codeString = String(props.children).replace(/\n$/, '');
+              return <VSCodeCodeBlock language={language} code={codeString} />;
             },
             code({ node, inline, className, children, ...props }) {
               if (inline) {
@@ -116,7 +123,8 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
                   </code>
                 );
               }
-              // For non-inline code not caught by 'pre' (should be rare with above pre override)
+              // This case should ideally be handled by the 'pre' override for block code.
+              // If it's reached, it's likely a block code without a 'pre' parent or specific language.
               const match = /language-(\w+)/.exec(className || '');
               return (
                  <VSCodeCodeBlock
@@ -156,12 +164,17 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
         components={{
            pre: ({ node, ...props }) => {
               const codeNode = props.children?.[0] as React.ReactElement;
-              if (codeNode && codeNode.type === 'code' && codeNode.props.className) {
-                const language = codeNode.props.className.replace('language-', '');
-                const codeString = String(codeNode.props.children).replace(/\n$/, '');
-                return <VSCodeCodeBlock language={language} code={codeString} />;
+              let codeString = "";
+              let language = "plaintext";
+              if (codeNode && codeNode.type === 'code') {
+                 if (codeNode.props.className) {
+                    language = codeNode.props.className.replace('language-', '');
+                 }
+                 codeString = String(codeNode.props.children).replace(/\n$/, '');
+                 return <VSCodeCodeBlock language={language} code={codeString} />;
               }
-              return <pre {...props} />;
+              codeString = String(props.children).replace(/\n$/, '');
+              return <VSCodeCodeBlock language={language} code={codeString} />;
             },
             code({ node, inline, className, children, ...props }) {
               if (inline) {
@@ -190,7 +203,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
   return (
     <div
       className={cn(
-        "flex items-end gap-2 animate-in fade-in duration-500 markdown-container group relative", // Added group and relative for positioning copy button
+        "flex items-end gap-2 animate-in fade-in duration-500 markdown-container group", 
         isUser ? "justify-end" : "justify-start"
       )}
     >
@@ -201,28 +214,29 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
           </AvatarFallback>
         </Avatar>
       )}
-      <div className="flex flex-col w-full"> {/* Ensure Card takes full width available in its column */}
+      <div className="flex flex-col w-full">
         <Card
           className={cn(
             "max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl shadow-md rounded-xl",
-            isUser ? "bg-primary text-primary-foreground" : "bg-card",
+            isUser ? "bg-primary text-primary-foreground" : "bg-card relative" // Added 'relative' for assistant's card
           )}
         >
           <CardContent className={cn("p-3 text-sm break-words", {"prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2": (isTypingComplete || isUser) && !message.isThinkingPlaceholder && !message.isProcessingContext })}>
             {renderContent()}
           </CardContent>
+          {!isUser && isTypingComplete && !message.isThinkingPlaceholder && !message.isProcessingContext && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleCopyText}
+              className="absolute top-1 right-1 h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
+              aria-label="Copiar texto da IA"
+            >
+              {isCopied ? <CheckIcon className="h-4 w-4 text-green-500" /> : <CopyIcon className="h-4 w-4" />}
+            </Button>
+          )}
         </Card>
-        {!isUser && isTypingComplete && !message.isThinkingPlaceholder && !message.isProcessingContext && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleCopyText}
-            className="absolute top-1 right-1 h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
-            aria-label="Copiar texto da IA"
-          >
-            {isCopied ? <CheckIcon className="h-4 w-4 text-green-500" /> : <CopyIcon className="h-4 w-4" />}
-          </Button>
-        )}
+        
         {!isUser && message.images && message.images.length > 0 && (isTypingComplete || (!message.isThinkingPlaceholder && !message.isProcessingContext)) && (
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl">
             {message.images.map((img, index) => (
@@ -251,6 +265,3 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
     </div>
   );
 }
-
-
-    
