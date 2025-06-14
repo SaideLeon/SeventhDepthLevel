@@ -137,9 +137,9 @@ export default function ChatInterface() {
 
   const handleSendMessage = async (e?: FormEvent) => {
     if (e) e.preventDefault();
-    if ((!inputValue.trim() && !selectedImageFile) || isLoading) return;
-
     const userMessageContent = inputValue.trim();
+    if ((!userMessageContent && !selectedImageFile) || isLoading) return;
+
     let userImageDataUri: string | undefined = undefined;
 
     setIsLoading(true);
@@ -184,10 +184,9 @@ export default function ChatInterface() {
 
     let contextContent: string | undefined = undefined;
     let imageInfo: string | undefined = undefined;
-    let performSearch = false;
-
+    
     try {
-      if (isSearchEnabled) {
+      if (isSearchEnabled && userMessageContent) { // Check for userMessageContent before deciding to search
         updateThinkingMessage(assistantMessageId, { content: "Analisando a necessidade de pesquisa...", isProcessingContext: true });
 
         const lastTwoAIMessages = messages.filter(msg => msg.role === 'assistant' && !msg.isThinkingPlaceholder && msg.id !== assistantMessageId).slice(-2);
@@ -198,7 +197,7 @@ export default function ChatInterface() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                currentUserQuery: userMessageContent,
+                currentUserQuery: userMessageContent, // Safe, as userMessageContent is not empty here
                 previousAiResponse1,
                 previousAiResponse2
             }),
@@ -209,14 +208,13 @@ export default function ChatInterface() {
             throw new Error(`Failed to decide search necessity: ${errorData.error || decisionResponse.statusText}`);
         }
         const decisionResult: DecideSearchNecessityOutput = await decisionResponse.json();
-        performSearch = decisionResult.decision === "SEARCH_NEEDED";
-
-        if (performSearch) {
+        
+        if (decisionResult.decision === "SEARCH_NEEDED") {
           updateThinkingMessage(assistantMessageId, { content: "Detectando o tópico para pesquisa...", isProcessingContext: true });
           const topicResponse = await fetch('/api/detect-topic', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ textQuery: userMessageContent }),
+            body: JSON.stringify({ textQuery: userMessageContent }), // Safe, as userMessageContent is not empty
           });
           if (!topicResponse.ok) throw new Error("Falha ao detectar o tópico");
           const topicResult: DetectTopicFromTextOutput = await topicResponse.json();
@@ -272,12 +270,23 @@ export default function ChatInterface() {
                await new Promise(resolve => setTimeout(resolve, 1500));
             }
           }
-        } else {
+        } else { // Decision was NO_SEARCH_NEEDED
             updateThinkingMessage(assistantMessageId, { content: "Prosseguindo com conhecimento geral...", isProcessingContext: false });
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
-      } else {
+      } else if (isSearchEnabled && !userMessageContent && userImageDataUri) {
+        // Image only, search enabled, but no text to search for.
+        updateThinkingMessage(assistantMessageId, { content: "Gerando resposta para a imagem...", isProcessingContext: false });
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+       else { // Search disabled or no text content (and no image if previous block didn't catch it)
          updateThinkingMessage(assistantMessageId, { content: "Gerando resposta...", isProcessingContext: false });
+         // Add a small delay if no specific processing happened before this.
+         if (!userMessageContent && !userImageDataUri) { // Should be rare due to button guards
+            await new Promise(resolve => setTimeout(resolve, 500));
+         } else if (!userMessageContent && userImageDataUri && !isSearchEnabled) { // Image only, search disabled
+            await new Promise(resolve => setTimeout(resolve, 500));
+         }
       }
 
       updateThinkingMessage(assistantMessageId, {
@@ -390,7 +399,7 @@ export default function ChatInterface() {
       <div className="p-4 border-t bg-background sticky bottom-0">
         {selectedImagePreview && (
           <div className="mb-2 relative w-24 h-24 border rounded-md overflow-hidden shadow">
-            <Image src={selectedImagePreview} alt="Selected preview" layout="fill" objectFit="cover" />
+            <Image src={selectedImagePreview} alt="Selected preview" layout="fill" objectFit="cover" data-ai-hint="image preview" />
             <Button
               variant="destructive"
               size="icon"
@@ -444,3 +453,5 @@ export default function ChatInterface() {
     </div>
   );
 }
+
+    
