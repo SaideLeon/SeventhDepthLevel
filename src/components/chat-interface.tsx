@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { FormEvent } from "react";
@@ -64,34 +65,54 @@ export default function ChatInterface() {
     e.preventDefault();
     if (!inputValue.trim() || isLoading) return;
 
+    const userMessageContent = inputValue.trim();
+    setInputValue("");
+    setIsLoading(true);
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: inputValue.trim(),
+      content: userMessageContent,
     };
-    setMessages((prev) => [...prev, userMessage]);
-    setInputValue("");
-    setIsLoading(true);
+
+    const assistantMessageId = (Date.now() + 1).toString();
+
+    const thinkingMessage: Message = {
+      id: assistantMessageId,
+      role: "assistant",
+      content: "Estou pensando na resposta...",
+    };
+
+    setMessages((prev) => [...prev, userMessage, thinkingMessage]);
 
     try {
       const aiResult: GenerateResponseOutput = await generateResponse({
         prompt: userMessage.content,
-        persona: aiPersona || undefined, // Send undefined if empty
-        rules: aiRules || undefined,     // Send undefined if empty
+        persona: aiPersona || undefined,
+        rules: aiRules || undefined,
       });
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: aiResult.response,
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg.id === assistantMessageId
+            ? { ...msg, content: aiResult.response }
+            : msg
+        )
+      );
     } catch (error) {
       console.error("Error generating AI response:", error);
       toast({
-        title: "Error",
-        description: "Failed to get a response from the AI. Please try again.",
+        title: "Erro",
+        description: "Falha ao obter uma resposta da IA. Por favor, tente novamente.",
         variant: "destructive",
       });
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg.id === assistantMessageId
+            ? { ...msg, content: "Desculpe, não consegui processar sua solicitação." }
+            : msg
+        )
+      );
     } finally {
       setIsLoading(false);
     }
