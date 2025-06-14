@@ -16,17 +16,12 @@ import type { DecideSearchNecessityOutput } from "@/ai/flows/decide-search-flow"
 import type { SearchResult, PageContent } from "@/utils/raspagem";
 import { useToast } from "@/hooks/use-toast";
 
-interface MessageImage {
-  src: string;
-  alt: string;
-}
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   isThinkingPlaceholder?: boolean;
   startTime?: number;
-  // images?: MessageImage[]; // Removed as per previous request, AI embeds images
   isProcessingContext?: boolean; 
 }
 
@@ -43,7 +38,7 @@ export default function ChatInterface() {
   const [typingSpeed, setTypingSpeed] = useState<number>(1);
   const [aiPersona, setAiPersona] = useState<string>("");
   const [aiRules, setAiRules] = useState<string>("");
-  const [isSearchEnabled, setIsSearchEnabled] = useState<boolean>(true); // Master toggle for auto-search feature
+  const [isSearchEnabled, setIsSearchEnabled] = useState<boolean>(true); 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const { toast } = useToast();
@@ -109,10 +104,10 @@ export default function ChatInterface() {
     const thinkingMessage: Message = {
       id: assistantMessageId,
       role: "assistant",
-      content: "Thinking...", // Default initial thinking message
+      content: "Thinking...", 
       isThinkingPlaceholder: true,
       startTime: Date.now(),
-      isProcessingContext: false, // Will be true if search is initiated
+      isProcessingContext: false, 
     };
 
     setMessages((prev) => [...prev, userMessage, thinkingMessage]);
@@ -178,10 +173,9 @@ export default function ChatInterface() {
               const pageContent: PageContent = await contentApiResponse.json();
 
               if (pageContent.conteudo && !pageContent.erro) {
-                contextContent = `Title: ${pageContent.titulo}\nAuthor: ${pageContent.autor || 'N/A'}\nContent:\n${pageContent.conteudo.substring(0, 30000)}...`; // Increased context limit
+                contextContent = `Title: ${pageContent.titulo}\nAuthor: ${pageContent.autor || 'N/A'}\nContent:\n${pageContent.conteudo.substring(0, 30000)}...`; 
                 
                 if (pageContent.imagens && pageContent.imagens.length > 0) {
-                  // AI will embed images using markdown, so we just pass the info
                   imageInfo = `Found images that might be relevant: ${pageContent.imagens.map(img => `${img.legenda || pageContent.titulo || 'Image'} (${img.src})`).join('; ')}`;
                 }
               }
@@ -192,17 +186,22 @@ export default function ChatInterface() {
           }
         } else {
             updateThinkingMessage(assistantMessageId, { content: "Proceeding with general knowledge...", isProcessingContext: false });
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Brief pause
+            await new Promise(resolve => setTimeout(resolve, 1000)); 
         }
       } else {
          updateThinkingMessage(assistantMessageId, { content: "Generating response...", isProcessingContext: false });
       }
       
-      // Final phase: AI generation
       updateThinkingMessage(assistantMessageId, { 
         content: contextContent ? "Generating response with new context..." : "Generating response...", 
         isProcessingContext: false 
       });
+
+      const conversationHistoryForAI = messages
+        .filter(msg => !msg.isThinkingPlaceholder && !msg.isProcessingContext && msg.id !== assistantMessageId) // Exclude current thinking message
+        .slice(-6) // Get the last N messages (e.g., 6)
+        .map(msg => ({ role: msg.role, content: msg.content }));
+
 
       const aiInput: GenerateResponseInput = {
         prompt: userMessage.content,
@@ -210,6 +209,7 @@ export default function ChatInterface() {
         rules: aiRules || undefined,
         contextContent: contextContent,
         imageInfo: imageInfo,
+        conversationHistory: conversationHistoryForAI.length > 0 ? conversationHistoryForAI : undefined,
       };
 
       const aiResult: GenerateResponseOutput = await generateResponse(aiInput);

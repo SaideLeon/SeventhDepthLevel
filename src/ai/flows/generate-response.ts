@@ -12,12 +12,18 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
+const MessageSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string(),
+});
+
 const GenerateResponseInputSchema = z.object({
   prompt: z.string().describe('The prompt to send to the AI.'),
   persona: z.string().optional().describe('The persona the AI should adopt.'),
   rules: z.string().optional().describe('Specific rules the AI should follow when responding.'),
   contextContent: z.string().optional().describe('Additional context obtained from web scraping to help answer the prompt.'),
   imageInfo: z.string().optional().describe('Information about images found during web scraping, if any (e.g., list of image URLs or descriptions in the format "alt text (URL)").'),
+  conversationHistory: z.array(MessageSchema).optional().describe('The recent history of the conversation, to provide context. User\'s current query is separate in "prompt". Ordered from oldest to newest relevant message.'),
 });
 export type GenerateResponseInput = z.infer<typeof GenerateResponseInputSchema>;
 
@@ -40,6 +46,15 @@ const generateResponsePrompt = ai.definePrompt({
 Please follow these general rules when responding:
 {{rules}}
 ---
+{{/if}}
+
+{{#if conversationHistory}}
+Consider the following recent conversation history to understand the context. The user's current query/prompt is provided separately below and is the most recent part of this interaction.
+Previous messages (oldest relevant to most recent before current query):
+{{#each conversationHistory}}
+{{role}}: {{{content}}}
+---
+{{/each}}
 {{/if}}
 
 The output must be formatted in Markdown.
@@ -93,7 +108,7 @@ The search also found the following image(s) which might be relevant. Refer to \
 ---
 {{/if}}
 
-User's question: {{prompt}}`,
+User's current question/prompt: {{prompt}}`,
 });
 
 const generateResponseFlow = ai.defineFlow(
@@ -107,4 +122,3 @@ const generateResponseFlow = ai.defineFlow(
     return output!;
   }
 );
-
