@@ -4,3 +4,5 @@ config();
 
 import '@/ai/flows/generate-response.ts';
 import '@/ai/flows/detect-topic-flow.ts';
+import '@/ai/flows/decide-search-flow.ts';
+

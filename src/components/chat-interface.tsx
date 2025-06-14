@@ -3,7 +3,6 @@
 
 import type { FormEvent } from "react";
 import React, { useState, useRef, useEffect } from "react";
-// import Image from "next/image"; // Import next/image -- Not directly used here, but in ChatMessage
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -13,6 +12,7 @@ import SettingsPopover from "@/components/settings-popover";
 import ThemeToggleButton from "./theme-toggle-button";
 import { generateResponse, type GenerateResponseOutput, type GenerateResponseInput } from "@/ai/flows/generate-response";
 import type { DetectTopicFromTextOutput } from "@/ai/flows/detect-topic-flow";
+import type { DecideSearchNecessityOutput } from "@/ai/flows/decide-search-flow";
 import type { SearchResult, PageContent } from "@/utils/raspagem";
 import { useToast } from "@/hooks/use-toast";
 
@@ -26,8 +26,8 @@ interface Message {
   content: string;
   isThinkingPlaceholder?: boolean;
   startTime?: number;
-  images?: MessageImage[];
-  isProcessingContext?: boolean; // New state for multi-step loading
+  // images?: MessageImage[]; // Removed as per previous request, AI embeds images
+  isProcessingContext?: boolean; 
 }
 
 const TYPING_SPEED_STORAGE_KEY = "typewriterai_typing_speed";
@@ -43,7 +43,7 @@ export default function ChatInterface() {
   const [typingSpeed, setTypingSpeed] = useState<number>(1);
   const [aiPersona, setAiPersona] = useState<string>("");
   const [aiRules, setAiRules] = useState<string>("");
-  const [isSearchEnabled, setIsSearchEnabled] = useState<boolean>(true);
+  const [isSearchEnabled, setIsSearchEnabled] = useState<boolean>(true); // Master toggle for auto-search feature
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const { toast } = useToast();
@@ -61,7 +61,7 @@ export default function ChatInterface() {
 
     const storedSearchEnabled = localStorage.getItem(SEARCH_ENABLED_STORAGE_KEY);
     if (storedSearchEnabled) setIsSearchEnabled(storedSearchEnabled === 'true');
-    else setIsSearchEnabled(true); // Default to true if not set
+    else setIsSearchEnabled(true); 
   }, []);
 
   useEffect(() => {
@@ -109,69 +109,100 @@ export default function ChatInterface() {
     const thinkingMessage: Message = {
       id: assistantMessageId,
       role: "assistant",
-      content: "Detecting topic...", // Initial thinking message
+      content: "Thinking...", // Default initial thinking message
       isThinkingPlaceholder: true,
       startTime: Date.now(),
-      isProcessingContext: isSearchEnabled,
+      isProcessingContext: false, // Will be true if search is initiated
     };
 
     setMessages((prev) => [...prev, userMessage, thinkingMessage]);
 
     let contextContent: string | undefined = undefined;
     let imageInfo: string | undefined = undefined;
-    let finalImages: MessageImage[] | undefined = undefined;
+    let performSearch = false;
 
     try {
       if (isSearchEnabled) {
-        // 1. Detect Topic
-        updateThinkingMessage(assistantMessageId, { content: "Detecting topic..." });
-        const topicResponse = await fetch('/api/detect-topic', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ textQuery: userMessageContent }),
-        });
-        if (!topicResponse.ok) throw new Error("Failed to detect topic");
-        const topicResult: DetectTopicFromTextOutput = await topicResponse.json();
-        const detectedTopic = topicResult.detectedTopic;
+        updateThinkingMessage(assistantMessageId, { content: "Analyzing need for search...", isProcessingContext: true });
+        
+        const lastTwoAIMessages = messages.filter(msg => msg.role === 'assistant' && !msg.isThinkingPlaceholder).slice(-2);
+        const previousAiResponse1 = lastTwoAIMessages.length > 0 ? lastTwoAIMessages[lastTwoAIMessages.length - 1].content : undefined;
+        const previousAiResponse2 = lastTwoAIMessages.length > 1 ? lastTwoAIMessages[0].content : undefined;
 
-        if (detectedTopic) {
-           updateThinkingMessage(assistantMessageId, { content: `Searching for: "${detectedTopic}"...` });
-          // 2. Search for articles (first page only)
-          const searchApiResponse = await fetch('/api/raspagem', {
+        const decisionResponse = await fetch('/api/decide-search', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ termoBusca: detectedTopic, todasPaginas: false }),
-          });
-          if (!searchApiResponse.ok) throw new Error("Failed to search articles");
-          const searchResults: SearchResult[] = await searchApiResponse.json();
+            body: JSON.stringify({ 
+                currentUserQuery: userMessageContent,
+                previousAiResponse1,
+                previousAiResponse2 
+            }),
+        });
 
-          if (searchResults.length > 0) {
-            updateThinkingMessage(assistantMessageId, { content: `Fetching content for "${searchResults[0].titulo}"...` });
-            // 3. Scrape content of the first article
-            const contentApiResponse = await fetch('/api/raspagem', {
+        if (!decisionResponse.ok) {
+            const errorData = await decisionResponse.json();
+            throw new Error(`Failed to decide search necessity: ${errorData.error || decisionResponse.statusText}`);
+        }
+        const decisionResult: DecideSearchNecessityOutput = await decisionResponse.json();
+        performSearch = decisionResult.decision === "SEARCH_NEEDED";
+
+        if (performSearch) {
+          updateThinkingMessage(assistantMessageId, { content: "Detecting topic...", isProcessingContext: true });
+          const topicResponse = await fetch('/api/detect-topic', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ textQuery: userMessageContent }),
+          });
+          if (!topicResponse.ok) throw new Error("Failed to detect topic");
+          const topicResult: DetectTopicFromTextOutput = await topicResponse.json();
+          const detectedTopic = topicResult.detectedTopic;
+
+          if (detectedTopic) {
+             updateThinkingMessage(assistantMessageId, { content: `Searching for: "${detectedTopic}"...` });
+            const searchApiResponse = await fetch('/api/raspagem', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ url: searchResults[0].url }),
+              body: JSON.stringify({ termoBusca: detectedTopic, todasPaginas: false }),
             });
-            if (!contentApiResponse.ok) throw new Error("Failed to fetch article content");
-            const pageContent: PageContent = await contentApiResponse.json();
+            if (!searchApiResponse.ok) throw new Error("Failed to search articles");
+            const searchResults: SearchResult[] = await searchApiResponse.json();
 
-            if (pageContent.conteudo && !pageContent.erro) {
-              contextContent = `Title: ${pageContent.titulo}\nAuthor: ${pageContent.autor || 'N/A'}\nContent:\n${pageContent.conteudo.substring(0, 3000)}...`; // Limit context size
-              
-              if (pageContent.imagens && pageContent.imagens.length > 0) {
-                finalImages = pageContent.imagens.map(img => ({ src: img.src, alt: img.legenda || pageContent.titulo })); // Process all images
-                imageInfo = `Found images: ${finalImages.map(img => `${img.alt} (${img.src})`).join(', ')}`;
+            if (searchResults.length > 0) {
+              updateThinkingMessage(assistantMessageId, { content: `Fetching content for "${searchResults[0].titulo}"...` });
+              const contentApiResponse = await fetch('/api/raspagem', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: searchResults[0].url }),
+              });
+              if (!contentApiResponse.ok) throw new Error("Failed to fetch article content");
+              const pageContent: PageContent = await contentApiResponse.json();
+
+              if (pageContent.conteudo && !pageContent.erro) {
+                contextContent = `Title: ${pageContent.titulo}\nAuthor: ${pageContent.autor || 'N/A'}\nContent:\n${pageContent.conteudo.substring(0, 30000)}...`; // Increased context limit
+                
+                if (pageContent.imagens && pageContent.imagens.length > 0) {
+                  // AI will embed images using markdown, so we just pass the info
+                  imageInfo = `Found images that might be relevant: ${pageContent.imagens.map(img => `${img.legenda || pageContent.titulo || 'Image'} (${img.src})`).join('; ')}`;
+                }
               }
+            } else {
+               updateThinkingMessage(assistantMessageId, { content: `No direct articles found for "${detectedTopic}". Proceeding with general knowledge...` });
+               await new Promise(resolve => setTimeout(resolve, 1500)); 
             }
-          } else {
-             updateThinkingMessage(assistantMessageId, { content: `No direct articles found for "${detectedTopic}". Proceeding with general knowledge...` });
-             await new Promise(resolve => setTimeout(resolve, 1500)); // Brief pause
           }
+        } else {
+            updateThinkingMessage(assistantMessageId, { content: "Proceeding with general knowledge...", isProcessingContext: false });
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Brief pause
         }
+      } else {
+         updateThinkingMessage(assistantMessageId, { content: "Generating response...", isProcessingContext: false });
       }
       
-      updateThinkingMessage(assistantMessageId, { content: "", isProcessingContext: false }); // Clear processing message, start AI generation phase
+      // Final phase: AI generation
+      updateThinkingMessage(assistantMessageId, { 
+        content: contextContent ? "Generating response with new context..." : "Generating response...", 
+        isProcessingContext: false 
+      });
 
       const aiInput: GenerateResponseInput = {
         prompt: userMessage.content,
@@ -186,15 +217,16 @@ export default function ChatInterface() {
       setMessages((prevMessages) =>
         prevMessages.map((msg) =>
           msg.id === assistantMessageId
-            ? { ...msg, content: aiResult.response, isThinkingPlaceholder: false, startTime: undefined, images: finalImages, isProcessingContext: false }
+            ? { ...msg, content: aiResult.response, isThinkingPlaceholder: false, startTime: undefined, isProcessingContext: false }
             : msg
         )
       );
     } catch (error) {
-      console.error("Error in multi-step AI response generation:", error);
+      console.error("Error in AI response generation:", error);
       let errorDescription = "Falha ao obter uma resposta da IA. Por favor, tente novamente.";
       if (error instanceof Error) {
-        if (error.message.includes("detect topic")) errorDescription = "Falha ao detectar o tópico.";
+        if (error.message.includes("decide search necessity")) errorDescription = "Falha ao decidir se a pesquisa era necessária.";
+        else if (error.message.includes("detect topic")) errorDescription = "Falha ao detectar o tópico.";
         else if (error.message.includes("search articles")) errorDescription = "Falha ao buscar artigos.";
         else if (error.message.includes("fetch article content")) errorDescription = "Falha ao buscar conteúdo do artigo.";
       }
@@ -251,7 +283,7 @@ export default function ChatInterface() {
           <Button variant="ghost" size="icon" onClick={handleClearConversation} aria-label="Clear conversation">
             <Trash2 className="h-5 w-5 text-muted-foreground hover:text-destructive" />
           </Button>
-           <Button variant="ghost" size="icon" onClick={() => setIsSearchEnabled(prev => !prev)} aria-label={isSearchEnabled ? "Disable Contextual Search" : "Enable Contextual Search"}>
+           <Button variant="ghost" size="icon" onClick={() => setIsSearchEnabled(prev => !prev)} aria-label={isSearchEnabled ? "Disable Contextual Search Automation" : "Enable Contextual Search Automation"}>
             {isSearchEnabled ? <SearchCheck className="h-5 w-5 text-accent" /> : <SearchSlash className="h-5 w-5 text-muted-foreground" />}
           </Button>
         </div>
