@@ -37,22 +37,39 @@ const generateResponsePrompt = ai.definePrompt({
   prompt: `{{#if persona}}You are acting as: {{persona}}.{{/if}}
 
 {{#if rules}}
-Please follow these rules when responding:
+Please follow these general rules when responding:
 {{rules}}
 ---
 {{/if}}
 
+The output must be formatted in Markdown.
+When generating the text, please follow these steps:
+1.  Structure the academic text with clear and relevant headings (e.g., # Section Title, ## Subsection, etc.) only if appropriate for the section. Use Markdown heading syntax.
+2.  For the heading(s) you create or identify from the instructions, ensure that the content beneath it is thoroughly developed and expanded upon. Provide detailed explanations, examples, arguments, and supporting details as appropriate for an academic paper.
+3.  Follow the American Psychological Association (APA) 7th edition guidelines for all citations and references. Use the author-date system. Each citation must include the author's surname, year of publication, and page numbers. Prioritize the use of short direct citations (less than 40 words) incorporated into the text.
+    There are three main types of citations:
+      - Indirect citation: Paraphrase the author's idea in your own words. Example: (Pinto, 2008, p. 29).
+      - Direct citation (short, less than 40 words): Incorporate the quote into the text with double quotation marks. Example: Era um estágio que conferia “habilitação preferencial para o provimento dos lugares de arquivista” (Silva & Ribeiro, 2002, pp. 143-144).
+      - Direct citation (long, 40 words or more): Present the quote in a separate block, without quotation marks, indented from the left margin (usually 0.5 inches or 1.27 cm), and typically double-spaced. Example:
+        Na década de 70 abre-se um novo período na vida dos profissionais da informação com a criação da primeira associação profissional do sector. Nessa altura:
+
+        > Debatia-se então, o orgulho de ser um profissional BAD sem complexos perante as outras profissões mais afirmativas e com maior reconhecimento social, com estatutos remuneratórios mais compensadores e carreiras mais bem definidas e estruturadas. Foram tempos de mudança, de luta, em que se ganhou consciência de classe. (Queirós, 2001, pp. 1-2)
+      - Citation of a citation (secondary source): Transmit the idea of an author whose original work you have not read, but was cited in another source. Example: (Smith, as cited in Jones, 2010, p. 15).
+4.  For all images, never include any URL parameters (such as '?width=50&blur=10') in the image source. Always use only the base image URL (e.g., 'https://static.todamateria.com.br/upload/fo/to/fotossistemas.jpg') when inserting images into the Markdown using the format: ![alt text](URL). This applies to all images, including those from the technical sheet (ficha técnica) and any other source.
+5.  The final output must be a single Markdown string. Ensure proper Markdown formatting for headings, paragraphs, lists, images, citations, etc.
+---
+
 {{#if contextContent}}
 Use the following information from a web search to help answer the user's question.
 This information was retrieved from the web and should be prioritized.
-If the information seems relevant, incorporate it naturally into your response.
+If the information seems relevant, incorporate it naturally into your response, following all formatting and citation guidelines mentioned above.
 Context:
 {{{contextContent}}}
 
 {{#if imageInfo}}
 The search also found the following image(s) which might be relevant:
 {{{imageInfo}}}
-(You do not need to display the images or directly reference them unless it's natural to the conversation, just be aware of their existence and content if described).
+(You do not need to display the images or directly reference them unless it's natural to the conversation, just be aware of their existence and content if described. If you do reference an image, use the Markdown format ![alt text](URL) and adhere to the image URL formatting rules mentioned above.)
 {{/if}}
 ---
 {{/if}}
