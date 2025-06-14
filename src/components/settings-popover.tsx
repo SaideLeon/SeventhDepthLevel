@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from "react";
@@ -49,9 +50,9 @@ export default function SettingsPopover({
             </div>
             <Slider
               id="typing-speed"
-              min={10}
+              min={1}
               max={200}
-              step={10}
+              step={1}
               value={[currentSpeed]}
               onValueChange={(value) => onSpeedChange(value[0])}
               className="[&>span:first-child]:bg-accent"

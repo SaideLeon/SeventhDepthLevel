@@ -29,16 +29,17 @@ export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [typingSpeed, setTypingSpeed] = useState<number>(50);
+  const [typingSpeed, setTypingSpeed] = useState<number>(1); // Default speed set to 1ms
   const [aiPersona, setAiPersona] = useState<string>("");
   const [aiRules, setAiRules] = useState<string>("");
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const formRef = useRef<HTMLFormElement>(null); 
+  const formRef = useRef<HTMLFormElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     const storedSpeed = localStorage.getItem(TYPING_SPEED_STORAGE_KEY);
     if (storedSpeed) setTypingSpeed(Number(storedSpeed));
+    else setTypingSpeed(1); // Ensure default is 1 if nothing is stored
 
     const storedPersona = localStorage.getItem(AI_PERSONA_STORAGE_KEY);
     if (storedPersona) setAiPersona(storedPersona);
@@ -65,12 +66,12 @@ export default function ChatInterface() {
     }
   }, [messages]);
 
-  const handleSendMessage = async (e?: FormEvent) => { 
+  const handleSendMessage = async (e?: FormEvent) => {
     if (e) e.preventDefault();
     if (!inputValue.trim() || isLoading) return;
 
     const userMessageContent = inputValue.trim();
-    setInputValue(""); 
+    setInputValue("");
     setIsLoading(true);
 
     const userMessage: Message = {
@@ -84,7 +85,7 @@ export default function ChatInterface() {
     const thinkingMessage: Message = {
       id: assistantMessageId,
       role: "assistant",
-      content: "", 
+      content: "",
       isThinkingPlaceholder: true,
       startTime: Date.now(),
     };
@@ -130,7 +131,7 @@ export default function ChatInterface() {
 
   const handleInputKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault(); 
+      event.preventDefault();
       if (!isLoading && inputValue.trim()) {
          handleSendMessage();
       }
