@@ -17,7 +17,7 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   isThinkingPlaceholder?: boolean;
-  startTime?: number; // Added to track start time for thinking placeholder
+  startTime?: number;
 }
 
 const TYPING_SPEED_STORAGE_KEY = "typewriterai_typing_speed";
@@ -32,6 +32,7 @@ export default function ChatInterface() {
   const [aiPersona, setAiPersona] = useState<string>("");
   const [aiRules, setAiRules] = useState<string>("");
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null); // Ref for the form
   const { toast } = useToast();
 
   useEffect(() => {
@@ -63,12 +64,12 @@ export default function ChatInterface() {
     }
   }, [messages]);
 
-  const handleSendMessage = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleSendMessage = async (e?: FormEvent) => { // Make e optional for programmatic submit
+    if (e) e.preventDefault();
     if (!inputValue.trim() || isLoading) return;
 
     const userMessageContent = inputValue.trim();
-    setInputValue("");
+    setInputValue(""); // Clear input after sending
     setIsLoading(true);
 
     const userMessage: Message = {
@@ -82,9 +83,9 @@ export default function ChatInterface() {
     const thinkingMessage: Message = {
       id: assistantMessageId,
       role: "assistant",
-      content: "", // Content is empty as spinner will be shown
+      content: "",
       isThinkingPlaceholder: true,
-      startTime: Date.now(), // Record start time
+      startTime: Date.now(),
     };
 
     setMessages((prev) => [...prev, userMessage, thinkingMessage]);
@@ -126,6 +127,19 @@ export default function ChatInterface() {
     setMessages([]);
   };
 
+  const handleInputKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault(); // Prevent newline in textarea
+      if (!isLoading && inputValue.trim()) {
+         // Programmatically submit the form if using formRef.current.requestSubmit()
+         // Or call handleSendMessage directly if it doesn't rely on form event
+         handleSendMessage();
+      }
+    }
+    // Shift+Enter will naturally create a newline in a textarea
+  };
+
+
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
       <header className="p-4 border-b flex justify-between items-center shadow-sm sticky top-0 bg-background z-10">
@@ -158,15 +172,15 @@ export default function ChatInterface() {
       </ScrollArea>
 
       <div className="p-4 border-t bg-background sticky bottom-0">
-        <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
+        <form onSubmit={handleSendMessage} className="flex gap-2 items-center" ref={formRef}>
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleInputKeyDown}
             placeholder="Type your message..."
             disabled={isLoading}
             className="flex-1 rounded-full px-4 py-2 focus-visible:ring-primary"
             aria-label="Message input"
-            spellCheck={false}
           />
           <Button type="submit" disabled={isLoading || !inputValue.trim()} size="icon" className="rounded-full bg-primary hover:bg-primary/90 disabled:bg-muted" aria-label="Send message">
             {isLoading ? (
