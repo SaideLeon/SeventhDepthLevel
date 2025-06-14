@@ -41,7 +41,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
         className={cn(
           "max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl shadow-md rounded-xl",
           isUser ? "bg-primary text-primary-foreground" : "bg-card",
-          !isUser && message.isThinkingPlaceholder && "animate-pulse"
+          !isUser && message.isThinkingPlaceholder && "animate-bubble-pulse"
         )}
       >
         <CardContent className="p-3 text-sm break-words">
