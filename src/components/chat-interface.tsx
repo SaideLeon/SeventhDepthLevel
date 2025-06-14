@@ -25,10 +25,10 @@ interface Message {
   isProcessingContext?: boolean;
 }
 
-const TYPING_SPEED_STORAGE_KEY = "typewriterai_typing_speed";
-const AI_PERSONA_STORAGE_KEY = "typewriterai_persona";
-const AI_RULES_STORAGE_KEY = "typewriterai_rules";
-const SEARCH_ENABLED_STORAGE_KEY = "typewriterai_search_enabled";
+const TYPING_SPEED_STORAGE_KEY = "seventhdepthlevel_typing_speed";
+const AI_PERSONA_STORAGE_KEY = "seventhdepthlevel_persona";
+const AI_RULES_STORAGE_KEY = "seventhdepthlevel_rules";
+const SEARCH_ENABLED_STORAGE_KEY = "seventhdepthlevel_search_enabled";
 
 
 export default function ChatInterface() {
@@ -142,7 +142,7 @@ export default function ChatInterface() {
         performSearch = decisionResult.decision === "SEARCH_NEEDED";
 
         if (performSearch) {
-          updateThinkingMessage(assistantMessageId, { content: "Detectando o tópico...", isProcessingContext: true });
+          updateThinkingMessage(assistantMessageId, { content: "Detectando o tópico para pesquisa...", isProcessingContext: true });
           const topicResponse = await fetch('/api/detect-topic', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -153,11 +153,11 @@ export default function ChatInterface() {
           const detectedTopic = topicResult.detectedTopic;
 
           if (detectedTopic) {
-            updateThinkingMessage(assistantMessageId, { content: `Pesquisando por: "${detectedTopic}"...` });
+            updateThinkingMessage(assistantMessageId, { content: `Pesquisando por: "${detectedTopic}"... (até 3 páginas)` });
             const searchApiResponse = await fetch('/api/raspagem', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ termoBusca: detectedTopic, todasPaginas: true }), // Search up to 3 pages
+              body: JSON.stringify({ termoBusca: detectedTopic, todasPaginas: true }),
             });
             if (!searchApiResponse.ok) throw new Error("Failed to search articles");
             const searchResults: SearchResult[] = await searchApiResponse.json();
@@ -176,13 +176,13 @@ export default function ChatInterface() {
                   body: JSON.stringify({ url: article.url }),
                 });
                 if (!contentApiResponse.ok) {
-                  console.warn(`Failed to fetch content for ${article.url}`);
-                  continue; // Skip to next article if one fails
+                  console.warn(`Falha ao buscar conteúdo para ${article.url}`);
+                  continue; 
                 }
                 const pageContent: PageContent = await contentApiResponse.json();
 
                 if (pageContent.conteudo && !pageContent.erro) {
-                  aggregatedContext.push(`Fonte ${i + 1}: ${pageContent.titulo}\nAutor: ${pageContent.autor || 'N/A'}\nConteúdo:\n${pageContent.conteudo.substring(0, 10000)}...`); // Limit individual article length
+                  aggregatedContext.push(`Fonte ${i + 1}: ${pageContent.titulo}\nAutor: ${pageContent.autor || 'N/A'}\nConteúdo:\n${pageContent.conteudo.substring(0, 10000)}...`); 
                   if (pageContent.imagens && pageContent.imagens.length > 0) {
                     aggregatedImageInfo.push(pageContent.imagens.map(img => `${img.legenda || pageContent.titulo || 'Imagem'} (${img.src})`).join('; '));
                   }
@@ -281,7 +281,7 @@ export default function ChatInterface() {
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
       <header className="p-4 border-b flex justify-between items-center shadow-sm sticky top-0 bg-background z-10">
-        <h1 className="text-2xl font-headline font-semibold text-primary">TypewriterAI</h1>
+        <h1 className="text-2xl font-headline font-semibold text-primary">SeventhDepthLevel</h1>
         <div className="flex items-center gap-2">
           <ThemeToggleButton />
           <SettingsPopover
