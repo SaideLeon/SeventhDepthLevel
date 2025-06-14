@@ -22,7 +22,7 @@ interface Message {
   content: string;
   isThinkingPlaceholder?: boolean;
   startTime?: number;
-  isProcessingContext?: boolean; 
+  isProcessingContext?: boolean;
 }
 
 const TYPING_SPEED_STORAGE_KEY = "typewriterai_typing_speed";
@@ -104,7 +104,7 @@ export default function ChatInterface() {
     const thinkingMessage: Message = {
       id: assistantMessageId,
       role: "assistant",
-      content: "Thinking...", 
+      content: "Pensando...", 
       isThinkingPlaceholder: true,
       startTime: Date.now(),
       isProcessingContext: false, 
@@ -118,9 +118,9 @@ export default function ChatInterface() {
 
     try {
       if (isSearchEnabled) {
-        updateThinkingMessage(assistantMessageId, { content: "Analyzing need for search...", isProcessingContext: true });
+        updateThinkingMessage(assistantMessageId, { content: "Analisando a necessidade de pesquisa...", isProcessingContext: true });
         
-        const lastTwoAIMessages = messages.filter(msg => msg.role === 'assistant' && !msg.isThinkingPlaceholder).slice(-2);
+        const lastTwoAIMessages = messages.filter(msg => msg.role === 'assistant' && !msg.isThinkingPlaceholder && msg.id !== assistantMessageId).slice(-2);
         const previousAiResponse1 = lastTwoAIMessages.length > 0 ? lastTwoAIMessages[lastTwoAIMessages.length - 1].content : undefined;
         const previousAiResponse2 = lastTwoAIMessages.length > 1 ? lastTwoAIMessages[0].content : undefined;
 
@@ -142,7 +142,7 @@ export default function ChatInterface() {
         performSearch = decisionResult.decision === "SEARCH_NEEDED";
 
         if (performSearch) {
-          updateThinkingMessage(assistantMessageId, { content: "Detecting topic...", isProcessingContext: true });
+          updateThinkingMessage(assistantMessageId, { content: "Detectando o tópico...", isProcessingContext: true });
           const topicResponse = await fetch('/api/detect-topic', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -153,54 +153,72 @@ export default function ChatInterface() {
           const detectedTopic = topicResult.detectedTopic;
 
           if (detectedTopic) {
-             updateThinkingMessage(assistantMessageId, { content: `Searching for: "${detectedTopic}"...` });
+            updateThinkingMessage(assistantMessageId, { content: `Pesquisando por: "${detectedTopic}"...` });
             const searchApiResponse = await fetch('/api/raspagem', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ termoBusca: detectedTopic, todasPaginas: false }),
+              body: JSON.stringify({ termoBusca: detectedTopic, todasPaginas: true }), // Search up to 3 pages
             });
             if (!searchApiResponse.ok) throw new Error("Failed to search articles");
             const searchResults: SearchResult[] = await searchApiResponse.json();
+            
+            const articlesToFetch = searchResults.slice(0, 3); // Get up to 3 articles
+            let aggregatedContext: string[] = [];
+            let aggregatedImageInfo: string[] = [];
 
-            if (searchResults.length > 0) {
-              updateThinkingMessage(assistantMessageId, { content: `Fetching content for "${searchResults[0].titulo}"...` });
-              const contentApiResponse = await fetch('/api/raspagem', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: searchResults[0].url }),
-              });
-              if (!contentApiResponse.ok) throw new Error("Failed to fetch article content");
-              const pageContent: PageContent = await contentApiResponse.json();
+            if (articlesToFetch.length > 0) {
+              for (let i = 0; i < articlesToFetch.length; i++) {
+                const article = articlesToFetch[i];
+                updateThinkingMessage(assistantMessageId, { content: `Buscando conteúdo para o artigo ${i + 1} de ${articlesToFetch.length}: "${article.titulo.substring(0,30)}"...` });
+                const contentApiResponse = await fetch('/api/raspagem', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ url: article.url }),
+                });
+                if (!contentApiResponse.ok) {
+                  console.warn(`Failed to fetch content for ${article.url}`);
+                  continue; // Skip to next article if one fails
+                }
+                const pageContent: PageContent = await contentApiResponse.json();
 
-              if (pageContent.conteudo && !pageContent.erro) {
-                contextContent = `Title: ${pageContent.titulo}\nAuthor: ${pageContent.autor || 'N/A'}\nContent:\n${pageContent.conteudo.substring(0, 30000)}...`; 
-                
-                if (pageContent.imagens && pageContent.imagens.length > 0) {
-                  imageInfo = `Found images that might be relevant: ${pageContent.imagens.map(img => `${img.legenda || pageContent.titulo || 'Image'} (${img.src})`).join('; ')}`;
+                if (pageContent.conteudo && !pageContent.erro) {
+                  aggregatedContext.push(`Fonte ${i + 1}: ${pageContent.titulo}\nAutor: ${pageContent.autor || 'N/A'}\nConteúdo:\n${pageContent.conteudo.substring(0, 10000)}...`); // Limit individual article length
+                  if (pageContent.imagens && pageContent.imagens.length > 0) {
+                    aggregatedImageInfo.push(pageContent.imagens.map(img => `${img.legenda || pageContent.titulo || 'Imagem'} (${img.src})`).join('; '));
+                  }
                 }
               }
+              if (aggregatedContext.length > 0) {
+                contextContent = aggregatedContext.join("\n\n---\n\n");
+                if (aggregatedImageInfo.length > 0) {
+                    imageInfo = `Imagens encontradas que podem ser relevantes: ${aggregatedImageInfo.join('; ')}`;
+                }
+              } else {
+                 updateThinkingMessage(assistantMessageId, { content: `Nenhum conteúdo de artigo encontrado para "${detectedTopic}". Prosseguindo com conhecimento geral...` });
+                 await new Promise(resolve => setTimeout(resolve, 1500)); 
+              }
             } else {
-               updateThinkingMessage(assistantMessageId, { content: `No direct articles found for "${detectedTopic}". Proceeding with general knowledge...` });
+               updateThinkingMessage(assistantMessageId, { content: `Nenhum artigo relevante encontrado para "${detectedTopic}". Prosseguindo com conhecimento geral...` });
                await new Promise(resolve => setTimeout(resolve, 1500)); 
             }
           }
         } else {
-            updateThinkingMessage(assistantMessageId, { content: "Proceeding with general knowledge...", isProcessingContext: false });
+            updateThinkingMessage(assistantMessageId, { content: "Prosseguindo com conhecimento geral...", isProcessingContext: false });
             await new Promise(resolve => setTimeout(resolve, 1000)); 
         }
       } else {
-         updateThinkingMessage(assistantMessageId, { content: "Generating response...", isProcessingContext: false });
+         updateThinkingMessage(assistantMessageId, { content: "Gerando resposta...", isProcessingContext: false });
       }
       
       updateThinkingMessage(assistantMessageId, { 
-        content: contextContent ? "Generating response with new context..." : "Generating response...", 
+        content: contextContent ? "Gerando resposta com o novo contexto..." : "Gerando resposta...", 
         isProcessingContext: false 
       });
 
       const conversationHistoryForAI = messages
-        .filter(msg => !msg.isThinkingPlaceholder && !msg.isProcessingContext && msg.id !== assistantMessageId) // Exclude current thinking message
-        .slice(-6) // Get the last N messages (e.g., 6)
-        .map(msg => ({ role: msg.role, content: msg.content }));
+        .filter(msg => !msg.isThinkingPlaceholder && !msg.isProcessingContext && msg.id !== assistantMessageId)
+        .slice(-6) 
+        .map(msg => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
 
 
       const aiInput: GenerateResponseInput = {
@@ -283,7 +301,7 @@ export default function ChatInterface() {
           <Button variant="ghost" size="icon" onClick={handleClearConversation} aria-label="Clear conversation">
             <Trash2 className="h-5 w-5 text-muted-foreground hover:text-destructive" />
           </Button>
-           <Button variant="ghost" size="icon" onClick={() => setIsSearchEnabled(prev => !prev)} aria-label={isSearchEnabled ? "Disable Contextual Search Automation" : "Enable Contextual Search Automation"}>
+           <Button variant="ghost" size="icon" onClick={() => setIsSearchEnabled(prev => !prev)} aria-label={isSearchEnabled ? "Desativar Automação de Pesquisa Contextual" : "Ativar Automação de Pesquisa Contextual"}>
             {isSearchEnabled ? <SearchCheck className="h-5 w-5 text-accent" /> : <SearchSlash className="h-5 w-5 text-muted-foreground" />}
           </Button>
         </div>
@@ -303,7 +321,7 @@ export default function ChatInterface() {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleInputKeyDown}
-            placeholder="Type your message..."
+            placeholder="Digite sua mensagem..."
             disabled={isLoading}
             className="flex-1 rounded-full px-4 py-2 focus-visible:ring-primary"
             aria-label="Message input"

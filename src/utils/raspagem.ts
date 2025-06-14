@@ -3,10 +3,6 @@ import axios from 'axios';
 import { load } from 'cheerio';
 
 // Removed formatarData import as it's not critical for LLM context
-// import { formatarData } from '@/utils/formatarData';
-// const data = new Date();
-// const dataFormatada = formatarData(data);
-
 
 export interface SearchResult {
   titulo: string;
@@ -19,7 +15,6 @@ export interface PageContent {
   conteudo: string;
   imagens: Array<{ src: string; legenda: string }>;
   autor: string;
-  // citacao: string; // Simplified for now
   erro?: boolean;
 }
 
@@ -29,8 +24,8 @@ async function rasparTodasPaginasBusca(query: string, todasPaginas: boolean = fa
   const urlsSet = new Set<string>();
   const encodedQuery = encodeURIComponent(query);
   
-  // Limiting to first page if todasPaginas is false
-  const maxPaginas = todasPaginas ? Infinity : 1;
+  // If todasPaginas is true, search up to 3 pages. Otherwise, search 1 page.
+  const maxPaginas = todasPaginas ? 3 : 1;
 
   while (pagina <= maxPaginas) {
     const url = pagina === 1
@@ -59,9 +54,13 @@ async function rasparTodasPaginasBusca(query: string, todasPaginas: boolean = fa
         }
       });
 
-      if (!encontrouNestaPagina) break; // No new results on this page
+      if (!encontrouNestaPagina && pagina === 1) { // If no results on the first page, stop
+        break;
+      }
+      if (pagina >= maxPaginas || !encontrouNestaPagina) { // Stop if max pages reached or no new results on subsequent pages
+         break;
+      }
       pagina++;
-      if (pagina > maxPaginas) break;
 
     } catch (error) {
       console.error(`Erro ao raspar página de busca ${url}:`, error);
@@ -77,7 +76,6 @@ async function rasparConteudoPagina(url: string): Promise<PageContent> {
     const $ = load(html);
     const titulo = $('h1').first().text().trim();
     const paragrafos: string[] = [];
-    // const linksSet = new Set<string>(); // Not used in current return
     const imagens: { src: string; legenda: string }[] = [];
     
     $('figure').each((_, fig) => {
@@ -88,7 +86,6 @@ async function rasparConteudoPagina(url: string): Promise<PageContent> {
       if (src) imagens.push({ src, legenda });
     });
 
-    // Attempt to find images not within figures as well
     $('.main-content article img, .main-content .content img, article .content img, article img').each((_, img) => {
       let src = $(img).attr('src') || $(img).data('src') || '';
       if (src && src.startsWith('/')) src = 'https://www.todamateria.com.br' + src;
@@ -100,10 +97,8 @@ async function rasparConteudoPagina(url: string): Promise<PageContent> {
     $('.main-content article p, .main-content .content p, article .content p, article p').each((_, el) => {
       const txt = $(el).text().trim();
       if (txt.length > 0) paragrafos.push(txt);
-      // Link extraction logic removed for simplification, can be added if needed
     });
 
-    // Fallback paragraph extraction
     if (paragrafos.length === 0) {
       $('p').each((_, el) => {
         if (
@@ -129,11 +124,6 @@ async function rasparConteudoPagina(url: string): Promise<PageContent> {
               autor = json.author.name;
             } else if (Array.isArray(json.author) && json.author[0]?.name && typeof json.author[0].name === 'string') {
                autor = json.author[0].name;
-            } else if (json.name && typeof json.name === 'string' && !autor) { // Check if 'name' could be author
-              // Heuristic: if main page title matches this, it might be the site name not author
-              if (json.name !== titulo) {
-                //autor = json.name; // Could be publisher or site name
-              }
             }
           }
         } catch (e) {
@@ -142,21 +132,12 @@ async function rasparConteudoPagina(url: string): Promise<PageContent> {
       });
     }
     
-    // Simplified citation part
-    // let citacao = '';
-    // const citeCopy = $('#cite-copy .citation');
-    // if (citeCopy.length > 0) {
-    //   citacao = citeCopy.text().trim();
-    // }
-    // citacao = citacao + ` ${dataFormatada}`; // dataFormatada removed
-
     return {
       url,
       titulo,
       conteudo: paragrafos.join('\n\n'),
       imagens,
       autor,
-      // citacao // Simplified
     };
   } catch(e) {
     console.error(`Erro ao raspar conteúdo da página ${url}:`, e);
