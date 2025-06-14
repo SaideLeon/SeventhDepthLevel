@@ -110,8 +110,6 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
                 codeString = String(codeNode.props.children).replace(/\n$/, '');
                 return <VSCodeCodeBlock language={language} code={codeString} />;
               }
-              // Fallback for pre tags that don't directly contain a code tag with className
-              // This might happen with complex/nested markdown structures or plain pre tags
               codeString = String(props.children).replace(/\n$/, '');
               return <VSCodeCodeBlock language={language} code={codeString} />;
             },
@@ -123,8 +121,6 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
                   </code>
                 );
               }
-              // This case should ideally be handled by the 'pre' override for block code.
-              // If it's reached, it's likely a block code without a 'pre' parent or specific language.
               const match = /language-(\w+)/.exec(className || '');
               return (
                  <VSCodeCodeBlock
@@ -192,6 +188,18 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
                   />
               );
             },
+             img: ({ node, ...props }) => (
+              <span className="block my-3 rounded-lg overflow-hidden border shadow-sm">
+                <Image
+                  {...(props as React.ComponentProps<typeof Image>)}
+                  layout="responsive"
+                  width={700} // Provide a default width, layout="responsive" will scale it
+                  height={400} // Provide a default height
+                  className="object-contain" // Use object-contain or object-cover as needed
+                  data-ai-hint="illustration diagram" // Add a generic hint
+                />
+              </span>
+            ),
         }}
       >
         {message.content}
@@ -218,7 +226,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
         <Card
           className={cn(
             "max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl shadow-md rounded-xl",
-            isUser ? "bg-primary text-primary-foreground" : "bg-card relative" // Added 'relative' for assistant's card
+            isUser ? "bg-primary text-primary-foreground" : "bg-card relative"
           )}
         >
           <CardContent className={cn("p-3 text-sm break-words", {"prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2": (isTypingComplete || isUser) && !message.isThinkingPlaceholder && !message.isProcessingContext })}>
@@ -237,23 +245,6 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
           )}
         </Card>
         
-        {!isUser && message.images && message.images.length > 0 && (isTypingComplete || (!message.isThinkingPlaceholder && !message.isProcessingContext)) && (
-          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl">
-            {message.images.map((img, index) => (
-              <div key={index} className="relative aspect-video rounded-lg overflow-hidden border shadow-sm">
-                <Image
-                  src={img.src}
-                  alt={img.alt || `Scraped image ${index + 1}`}
-                  fill
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  className="object-cover"
-                  onError={(e) => { e.currentTarget.style.display = 'none'; /* Hide if image fails to load */ }}
-                />
-                {img.alt && <p className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1 truncate">{img.alt}</p>}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
       {isUser && (
          <Avatar className="h-8 w-8 self-start shadow-sm">
@@ -265,3 +256,4 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
     </div>
   );
 }
+
