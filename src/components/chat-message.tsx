@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { User, Bot, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,12 +12,19 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import VSCodeCodeBlock from "./vscode-code-block";
 
+interface MessageImage {
+  src: string;
+  alt: string;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   isThinkingPlaceholder?: boolean;
   startTime?: number;
+  images?: MessageImage[];
+  isProcessingContext?: boolean;
 }
 
 interface ChatMessageProps {
@@ -32,7 +40,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | undefined;
 
-    if (message.isThinkingPlaceholder && message.startTime) {
+    if ((message.isThinkingPlaceholder || message.isProcessingContext) && message.startTime) {
       setElapsedTime(Date.now() - message.startTime);
       intervalId = setInterval(() => {
         if (message.startTime) {
@@ -48,19 +56,16 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
         clearInterval(intervalId);
       }
     };
-  }, [message.isThinkingPlaceholder, message.startTime]);
+  }, [message.isThinkingPlaceholder, message.isProcessingContext, message.startTime]);
 
   useEffect(() => {
-    // Reset typing complete state when message content changes (for new AI messages)
-    if (message.role === "assistant" && !message.isThinkingPlaceholder) {
+    if (message.role === "assistant" && !message.isThinkingPlaceholder && !message.isProcessingContext) {
       setIsTypingComplete(false);
     }
-    // If it's a user message, or a thinking placeholder, consider typing "complete" for rendering purposes
-    if (isUser || message.isThinkingPlaceholder) {
+    if (isUser || message.isThinkingPlaceholder || message.isProcessingContext) {
         setIsTypingComplete(true);
     }
-
-  }, [message.content, message.role, isUser, message.isThinkingPlaceholder]);
+  }, [message.content, message.role, isUser, message.isThinkingPlaceholder, message.isProcessingContext]);
 
 
   const handleTypingComplete = () => {
@@ -73,33 +78,29 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
+            pre: ({ node, ...props }) => {
+              const codeNode = props.children?.[0] as React.ReactElement;
+              if (codeNode && codeNode.type === 'code' && codeNode.props.className) {
+                const language = codeNode.props.className.replace('language-', '');
+                const codeString = String(codeNode.props.children).replace(/\n$/, '');
+                return <VSCodeCodeBlock language={language} code={codeString} />;
+              }
+              return <pre {...props} />;
+            },
             code({ node, inline, className, children, ...props }) {
-              const match = /language-(\w+)/.exec(className || '');
-              if (!inline && match) {
+              if (inline) {
                 return (
-                  <VSCodeCodeBlock
-                    language={match[1]}
-                    code={String(children).replace(/\n$/, '')}
-                    className={className}
-                    node={node}
-                    {...props}
-                  />
-                );
-              } else if (inline) {
-                return (
-                  <code className="bg-muted px-1.5 py-0.5 rounded-sm font-mono text-sm mx-0.5" {...props}>
+                  <code className="bg-muted px-1.5 py-0.5 rounded-sm font-mono text-xs mx-0.5" {...props}>
                     {children}
                   </code>
                 );
               }
-              // Fallback for code blocks without a language or if something goes wrong
+              // For non-inline code not caught by 'pre' (should be rare with above pre override)
+              const match = /language-(\w+)/.exec(className || '');
               return (
                  <VSCodeCodeBlock
-                    language="plaintext"
+                    language={match ? match[1] : 'plaintext'}
                     code={String(children).replace(/\n$/, '')}
-                    className={className}
-                    node={node}
-                    {...props}
                   />
               );
             },
@@ -110,10 +111,11 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
       );
     }
 
-    if (message.isThinkingPlaceholder) {
+    if (message.isThinkingPlaceholder || message.isProcessingContext) {
       return (
-        <div className="flex justify-center items-center h-8 gap-2">
+        <div className="flex flex-col items-center justify-center h-auto p-2 gap-2">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <span className="text-xs text-muted-foreground text-center">{message.content || "Processing..."}</span>
           {message.startTime && (
             <span className="text-xs text-muted-foreground">
               ({elapsedTime} ms)
@@ -131,32 +133,28 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-           code({ node, inline, className, children, ...props }) {
-              const match = /language-(\w+)/.exec(className || '');
-              if (!inline && match) {
+           pre: ({ node, ...props }) => {
+              const codeNode = props.children?.[0] as React.ReactElement;
+              if (codeNode && codeNode.type === 'code' && codeNode.props.className) {
+                const language = codeNode.props.className.replace('language-', '');
+                const codeString = String(codeNode.props.children).replace(/\n$/, '');
+                return <VSCodeCodeBlock language={language} code={codeString} />;
+              }
+              return <pre {...props} />;
+            },
+            code({ node, inline, className, children, ...props }) {
+              if (inline) {
                 return (
-                  <VSCodeCodeBlock
-                    language={match[1]}
-                    code={String(children).replace(/\n$/, '')}
-                    className={className}
-                    node={node}
-                    {...props}
-                  />
-                );
-              } else if (inline) {
-                return (
-                  <code className="bg-muted px-1.5 py-0.5 rounded-sm font-mono text-sm mx-0.5" {...props}>
+                  <code className="bg-muted px-1.5 py-0.5 rounded-sm font-mono text-xs mx-0.5" {...props}>
                     {children}
                   </code>
                 );
               }
+              const match = /language-(\w+)/.exec(className || '');
               return (
                  <VSCodeCodeBlock
-                    language="plaintext"
+                    language={match ? match[1] : 'plaintext'}
                     code={String(children).replace(/\n$/, '')}
-                    className={className}
-                    node={node}
-                    {...props}
                   />
               );
             },
@@ -182,17 +180,35 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
           </AvatarFallback>
         </Avatar>
       )}
-      <Card
-        className={cn(
-          "max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl shadow-md rounded-xl",
-          isUser ? "bg-primary text-primary-foreground" : "bg-card",
-           message.isThinkingPlaceholder ? "animate-bubble-pulse" : ""
+      <div className="flex flex-col">
+        <Card
+          className={cn(
+            "max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl shadow-md rounded-xl",
+            isUser ? "bg-primary text-primary-foreground" : "bg-card",
+          )}
+        >
+          <CardContent className={cn("p-3 text-sm break-words", {"prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2": (isTypingComplete || isUser) && !message.isThinkingPlaceholder && !message.isProcessingContext })}>
+            {renderContent()}
+          </CardContent>
+        </Card>
+        {!isUser && message.images && message.images.length > 0 && (isTypingComplete || (!message.isThinkingPlaceholder && !message.isProcessingContext)) && (
+          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl">
+            {message.images.map((img, index) => (
+              <div key={index} className="relative aspect-video rounded-lg overflow-hidden border shadow-sm">
+                <Image
+                  src={img.src}
+                  alt={img.alt || `Scraped image ${index + 1}`}
+                  fill
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  className="object-cover"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; /* Hide if image fails to load */ }}
+                />
+                {img.alt && <p className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1 truncate">{img.alt}</p>}
+              </div>
+            ))}
+          </div>
         )}
-      >
-        <CardContent className={cn("p-3 text-sm break-words", {"prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2": isTypingComplete || isUser })}>
-          {renderContent()}
-        </CardContent>
-      </Card>
+      </div>
       {isUser && (
          <Avatar className="h-8 w-8 self-start shadow-sm">
           <AvatarFallback className="bg-secondary text-secondary-foreground">

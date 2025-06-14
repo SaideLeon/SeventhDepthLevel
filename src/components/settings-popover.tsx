@@ -12,6 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch"; // Added Switch
 
 interface SettingsPopoverProps {
   currentSpeed: number;
@@ -20,6 +21,8 @@ interface SettingsPopoverProps {
   onPersonaChange: (persona: string) => void;
   currentRules: string;
   onRulesChange: (rules: string) => void;
+  isSearchEnabled: boolean; // New prop
+  onSearchEnabledChange: (enabled: boolean) => void; // New prop
   children: React.ReactElement<React.ComponentProps<typeof Button>>;
 }
 
@@ -30,6 +33,8 @@ export default function SettingsPopover({
   onPersonaChange,
   currentRules,
   onRulesChange,
+  isSearchEnabled, // Destructure new prop
+  onSearchEnabledChange, // Destructure new prop
   children,
 }: SettingsPopoverProps) {
   return (
@@ -91,6 +96,21 @@ export default function SettingsPopover({
             />
             <p className="text-xs text-muted-foreground">
               Set specific rules for the AI's responses.
+            </p>
+          </div>
+
+          <div className="grid gap-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="search-enabled" className="text-foreground">Contextual Search</Label>
+              <Switch
+                id="search-enabled"
+                checked={isSearchEnabled}
+                onCheckedChange={onSearchEnabledChange}
+                aria-label="Toggle contextual search"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Allow AI to search the web for better context (experimental).
             </p>
           </div>
         </div>
