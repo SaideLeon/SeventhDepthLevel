@@ -3,14 +3,17 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import { User, Bot, Loader2 } from "lucide-react";
+import { User, Bot, Loader2, Copy as CopyIcon, Check as CheckIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import TypewriterEffect from "@/components/typewriter-effect";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import VSCodeCodeBlock from "./vscode-code-block";
+import { useToast } from "@/hooks/use-toast";
+
 
 interface MessageImage {
   src: string;
@@ -36,6 +39,8 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
   const isUser = message.role === "user";
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const [isTypingComplete, setIsTypingComplete] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | undefined;
@@ -72,6 +77,22 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
     setIsTypingComplete(true);
   };
 
+  const handleCopyText = async () => {
+    if (!message.content) return;
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000); // Reset icon after 2 seconds
+    } catch (err) {
+      console.error("Failed to copy text: ", err);
+      toast({
+        title: "Erro ao Copiar",
+        description: "Não foi possível copiar o texto para a área de transferência.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const renderContent = () => {
     if (isUser) {
       return (
@@ -90,7 +111,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
             code({ node, inline, className, children, ...props }) {
               if (inline) {
                 return (
-                  <code className="bg-muted px-1.5 py-0.5 rounded-sm font-mono text-xs mx-0.5" {...props}>
+                  <code className="bg-muted text-muted-foreground px-1.5 py-0.5 rounded-sm font-mono text-xs mx-0.5" {...props}>
                     {children}
                   </code>
                 );
@@ -145,7 +166,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
             code({ node, inline, className, children, ...props }) {
               if (inline) {
                 return (
-                  <code className="bg-muted px-1.5 py-0.5 rounded-sm font-mono text-xs mx-0.5" {...props}>
+                  <code className="bg-muted text-muted-foreground px-1.5 py-0.5 rounded-sm font-mono text-xs mx-0.5" {...props}>
                     {children}
                   </code>
                 );
@@ -169,7 +190,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
   return (
     <div
       className={cn(
-        "flex items-end gap-2 animate-in fade-in duration-500 markdown-container",
+        "flex items-end gap-2 animate-in fade-in duration-500 markdown-container group relative", // Added group and relative for positioning copy button
         isUser ? "justify-end" : "justify-start"
       )}
     >
@@ -180,7 +201,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
           </AvatarFallback>
         </Avatar>
       )}
-      <div className="flex flex-col">
+      <div className="flex flex-col w-full"> {/* Ensure Card takes full width available in its column */}
         <Card
           className={cn(
             "max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl shadow-md rounded-xl",
@@ -191,6 +212,17 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
             {renderContent()}
           </CardContent>
         </Card>
+        {!isUser && isTypingComplete && !message.isThinkingPlaceholder && !message.isProcessingContext && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleCopyText}
+            className="absolute top-1 right-1 h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
+            aria-label="Copiar texto da IA"
+          >
+            {isCopied ? <CheckIcon className="h-4 w-4 text-green-500" /> : <CopyIcon className="h-4 w-4" />}
+          </Button>
+        )}
         {!isUser && message.images && message.images.length > 0 && (isTypingComplete || (!message.isThinkingPlaceholder && !message.isProcessingContext)) && (
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl">
             {message.images.map((img, index) => (
@@ -219,3 +251,6 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
     </div>
   );
 }
+
+
+    
