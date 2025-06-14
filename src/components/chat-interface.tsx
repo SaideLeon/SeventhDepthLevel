@@ -3,7 +3,7 @@
 
 import type { FormEvent } from "react";
 import React, { useState, useRef, useEffect } from "react";
-import Image from "next/image"; // Import next/image
+// import Image from "next/image"; // Import next/image -- Not directly used here, but in ChatMessage
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -160,7 +160,7 @@ export default function ChatInterface() {
               contextContent = `Title: ${pageContent.titulo}\nAuthor: ${pageContent.autor || 'N/A'}\nContent:\n${pageContent.conteudo.substring(0, 3000)}...`; // Limit context size
               
               if (pageContent.imagens && pageContent.imagens.length > 0) {
-                finalImages = pageContent.imagens.slice(0, 3).map(img => ({ src: img.src, alt: img.legenda || pageContent.titulo })); // Take first 3 images
+                finalImages = pageContent.imagens.map(img => ({ src: img.src, alt: img.legenda || pageContent.titulo })); // Process all images
                 imageInfo = `Found images: ${finalImages.map(img => `${img.alt} (${img.src})`).join(', ')}`;
               }
             }
