@@ -15,18 +15,12 @@ import VSCodeCodeBlock from "./vscode-code-block";
 import { useToast } from "@/hooks/use-toast";
 
 
-interface MessageImage {
-  src: string;
-  alt: string;
-}
-
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   isThinkingPlaceholder?: boolean;
   startTime?: number;
-  images?: MessageImage[];
   isProcessingContext?: boolean;
 }
 
@@ -140,7 +134,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
       return (
         <div className="flex flex-col items-center justify-center h-auto p-2 gap-2">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          <span className="text-xs text-muted-foreground text-center">{message.content || "Processing..."}</span>
+          <span className="text-xs text-muted-foreground text-center">{message.content || "Processando..."}</span>
           {message.startTime && (
             <span className="text-xs text-muted-foreground">
               ({elapsedTime} ms)
@@ -193,10 +187,10 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
                 <Image
                   {...(props as React.ComponentProps<typeof Image>)}
                   layout="responsive"
-                  width={700} // Provide a default width, layout="responsive" will scale it
-                  height={400} // Provide a default height
-                  className="object-contain" // Use object-contain or object-cover as needed
-                  data-ai-hint="illustration diagram" // Add a generic hint
+                  width={700} 
+                  height={400} 
+                  className="object-contain" 
+                  data-ai-hint="illustration diagram" 
                 />
               </span>
             ),
