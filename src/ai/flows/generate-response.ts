@@ -19,6 +19,7 @@ const MessageSchema = z.object({
 
 const GenerateResponseInputSchema = z.object({
   prompt: z.string().describe('The prompt to send to the AI.'),
+  userImageInputDataUri: z.string().optional().describe("A Data URI of an image uploaded by the user with their prompt. Expected format: 'data:<mimetype>;base64,<encoded_data>'."),
   persona: z.string().optional().describe('The persona the AI should adopt.'),
   rules: z.string().optional().describe('Specific rules the AI should follow when responding.'),
   contextContent: z.string().optional().describe('Additional context obtained from web scraping to help answer the prompt.'),
@@ -66,12 +67,12 @@ When generating the text, please follow these steps meticulously:
     b.  **Alt Text**: Use the image's original caption (available from the \`imageInfo\` string, typically in "alt text (URL)" format) as the alt text in the Markdown.
     c.  **URL Formatting - ABSOLUTELY CRITICAL**: For ALL images, you **MUST** ensure that no URL parameters (like '?width=50&blur=10', '?size=small', etc.) are included in the image source URL within the Markdown. ALWAYS use only the base image URL. For example, if the context provides an image as 'https://static.todamateria.com.br/upload/fo/to/fotossistemas.jpg?width=50&blur=10', you MUST render it in Markdown as '![alt text](https://static.todamateria.com.br/upload/fo/to/fotossistemas.jpg)'. This rule applies to all images, including those from a technical sheet (ficha técnica) or any other source mentioned in the context.
 4.  **Citation Style - CRITICAL INSTRUCTION: YOU MUST PRIORITIZE NARRATIVE CITATIONS.**
-    When citing sources, you **MUST** primarily use a **narrative style**, integrating the author's name directly into the sentence using phrases like "Segundo Autor (data)...", "De acordo com Autor (data)...", "Autor (data) afirma que...", "Autor (data) explica que...".
+    When citing sources, you **MUST** primarily use a **narrative style**, integrating the author's name directly into the sentence using phrases like "Segundo Autor (data)...", "De acordo com Autor (data)...", "Autor (data) afirma que...", "Autor (data) explica que...", "Como Fulano (ano) aponta...", "Sicrano (ano) argumenta que...".
     **Example of the PREFERRED Narrative Style:**
     *   \`Segundo Castilho (s.d.), no ciclo rápido, o carbono move-se rapidamente...\`
     *   \`De acordo com Batista (s.d.), a fotossíntese transforma a energia luminosa...\`
     *   \`Pinto (2008) explica que a nova reforma só surgirá em 1982...\`
-    **AVOID this parenthetical style for paraphrases and short quotes:**
+    **AVOID this parenthetical style for paraphrases and short quotes as the primary method:**
     *   \`No ciclo rápido, o carbono move-se rapidamente... (Castilho, s.d.).\`
     *   \`A fotossíntese transforma a energia luminosa... (Batista, s.d.).\`
 
@@ -108,6 +109,12 @@ The search also found the following image(s) which might be relevant. Refer to \
 ---
 {{/if}}
 
+{{#if userImageInputDataUri}}
+The user has also provided the following image directly with their current query:
+{{media url=userImageInputDataUri}}
+Please consider this image when forming your response.
+---
+{{/if}}
 User's current question/prompt: {{prompt}}`,
 });
 

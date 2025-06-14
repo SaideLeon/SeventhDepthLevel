@@ -1,12 +1,13 @@
 
 "use client";
 
-import type { FormEvent } from "react";
+import type { FormEvent, ChangeEvent } from "react";
 import React, { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { SendHorizontal, Loader2, Trash2, Settings, SearchCheck, SearchSlash } from "lucide-react";
+import { SendHorizontal, Loader2, Trash2, Settings, SearchCheck, SearchSlash, Paperclip, X } from "lucide-react";
 import ChatMessage from "@/components/chat-message";
 import SettingsPopover from "@/components/settings-popover";
 import ThemeToggleButton from "./theme-toggle-button";
@@ -20,6 +21,7 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  imageDataUri?: string; // For user-uploaded images
   isThinkingPlaceholder?: boolean;
   startTime?: number;
   isProcessingContext?: boolean;
@@ -34,13 +36,16 @@ const SEARCH_ENABLED_STORAGE_KEY = "seventhdepthlevel_search_enabled";
 export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState<string>("");
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [typingSpeed, setTypingSpeed] = useState<number>(1);
   const [aiPersona, setAiPersona] = useState<string>("");
   const [aiRules, setAiRules] = useState<string>("");
-  const [isSearchEnabled, setIsSearchEnabled] = useState<boolean>(true); 
+  const [isSearchEnabled, setIsSearchEnabled] = useState<boolean>(true);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -56,7 +61,7 @@ export default function ChatInterface() {
 
     const storedSearchEnabled = localStorage.getItem(SEARCH_ENABLED_STORAGE_KEY);
     if (storedSearchEnabled) setIsSearchEnabled(storedSearchEnabled === 'true');
-    else setIsSearchEnabled(true); 
+    else setIsSearchEnabled(true);
   }, []);
 
   useEffect(() => {
@@ -82,32 +87,97 @@ export default function ChatInterface() {
     }
   }, [messages]);
 
+  const handleImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast({
+          title: "Imagem Muito Grande",
+          description: "Por favor, selecione uma imagem menor que 5MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+        toast({
+          title: "Tipo de Arquivo Inválido",
+          description: "Por favor, selecione um arquivo de imagem (JPEG, PNG, WEBP, GIF).",
+          variant: "destructive",
+        });
+        return;
+      }
+      setSelectedImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const clearSelectedImage = () => {
+    setSelectedImageFile(null);
+    setSelectedImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""; // Reset file input
+    }
+  };
+
+  const fileToDataUri = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
   const updateThinkingMessage = (id: string, updates: Partial<Message>) => {
     setMessages(prev => prev.map(msg => msg.id === id ? { ...msg, ...updates } : msg));
   };
 
   const handleSendMessage = async (e?: FormEvent) => {
     if (e) e.preventDefault();
-    if (!inputValue.trim() || isLoading) return;
+    if ((!inputValue.trim() && !selectedImageFile) || isLoading) return;
 
     const userMessageContent = inputValue.trim();
-    setInputValue("");
+    let userImageDataUri: string | undefined = undefined;
+
     setIsLoading(true);
+
+    if (selectedImageFile) {
+      try {
+        userImageDataUri = await fileToDataUri(selectedImageFile);
+      } catch (error) {
+        console.error("Error converting image to Data URI:", error);
+        toast({
+          title: "Erro ao Processar Imagem",
+          description: "Não foi possível processar a imagem selecionada.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    setInputValue("");
+    clearSelectedImage();
+
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
       content: userMessageContent,
+      imageDataUri: userImageDataUri,
     };
 
     const assistantMessageId = (Date.now() + 1).toString();
     const thinkingMessage: Message = {
       id: assistantMessageId,
       role: "assistant",
-      content: "Pensando...", 
+      content: "Pensando...",
       isThinkingPlaceholder: true,
       startTime: Date.now(),
-      isProcessingContext: false, 
+      isProcessingContext: false,
     };
 
     setMessages((prev) => [...prev, userMessage, thinkingMessage]);
@@ -119,7 +189,7 @@ export default function ChatInterface() {
     try {
       if (isSearchEnabled) {
         updateThinkingMessage(assistantMessageId, { content: "Analisando a necessidade de pesquisa...", isProcessingContext: true });
-        
+
         const lastTwoAIMessages = messages.filter(msg => msg.role === 'assistant' && !msg.isThinkingPlaceholder && msg.id !== assistantMessageId).slice(-2);
         const previousAiResponse1 = lastTwoAIMessages.length > 0 ? lastTwoAIMessages[lastTwoAIMessages.length - 1].content : undefined;
         const previousAiResponse2 = lastTwoAIMessages.length > 1 ? lastTwoAIMessages[0].content : undefined;
@@ -127,10 +197,10 @@ export default function ChatInterface() {
         const decisionResponse = await fetch('/api/decide-search', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
                 currentUserQuery: userMessageContent,
                 previousAiResponse1,
-                previousAiResponse2 
+                previousAiResponse2
             }),
         });
 
@@ -148,7 +218,7 @@ export default function ChatInterface() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ textQuery: userMessageContent }),
           });
-          if (!topicResponse.ok) throw new Error("Failed to detect topic");
+          if (!topicResponse.ok) throw new Error("Falha ao detectar o tópico");
           const topicResult: DetectTopicFromTextOutput = await topicResponse.json();
           const detectedTopic = topicResult.detectedTopic;
 
@@ -159,10 +229,10 @@ export default function ChatInterface() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ termoBusca: detectedTopic, todasPaginas: true }),
             });
-            if (!searchApiResponse.ok) throw new Error("Failed to search articles");
+            if (!searchApiResponse.ok) throw new Error("Falha ao buscar artigos");
             const searchResults: SearchResult[] = await searchApiResponse.json();
-            
-            const articlesToFetch = searchResults.slice(0, 3); // Get up to 3 articles
+
+            const articlesToFetch = searchResults.slice(0, 3);
             let aggregatedContext: string[] = [];
             let aggregatedImageInfo: string[] = [];
 
@@ -177,12 +247,12 @@ export default function ChatInterface() {
                 });
                 if (!contentApiResponse.ok) {
                   console.warn(`Falha ao buscar conteúdo para ${article.url}`);
-                  continue; 
+                  continue;
                 }
                 const pageContent: PageContent = await contentApiResponse.json();
 
                 if (pageContent.conteudo && !pageContent.erro) {
-                  aggregatedContext.push(`Fonte ${i + 1}: ${pageContent.titulo}\nAutor: ${pageContent.autor || 'N/A'}\nConteúdo:\n${pageContent.conteudo.substring(0, 10000)}...`); 
+                  aggregatedContext.push(`Fonte ${i + 1}: ${pageContent.titulo}\nAutor: ${pageContent.autor || 'N/A'}\nConteúdo:\n${pageContent.conteudo.substring(0, 10000)}...`);
                   if (pageContent.imagens && pageContent.imagens.length > 0) {
                     aggregatedImageInfo.push(pageContent.imagens.map(img => `${img.legenda || pageContent.titulo || 'Imagem'} (${img.src})`).join('; '));
                   }
@@ -195,34 +265,35 @@ export default function ChatInterface() {
                 }
               } else {
                  updateThinkingMessage(assistantMessageId, { content: `Nenhum conteúdo de artigo encontrado para "${detectedTopic}". Prosseguindo com conhecimento geral...` });
-                 await new Promise(resolve => setTimeout(resolve, 1500)); 
+                 await new Promise(resolve => setTimeout(resolve, 1500));
               }
             } else {
                updateThinkingMessage(assistantMessageId, { content: `Nenhum artigo relevante encontrado para "${detectedTopic}". Prosseguindo com conhecimento geral...` });
-               await new Promise(resolve => setTimeout(resolve, 1500)); 
+               await new Promise(resolve => setTimeout(resolve, 1500));
             }
           }
         } else {
             updateThinkingMessage(assistantMessageId, { content: "Prosseguindo com conhecimento geral...", isProcessingContext: false });
-            await new Promise(resolve => setTimeout(resolve, 1000)); 
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
       } else {
          updateThinkingMessage(assistantMessageId, { content: "Gerando resposta...", isProcessingContext: false });
       }
-      
-      updateThinkingMessage(assistantMessageId, { 
-        content: contextContent ? "Gerando resposta com o novo contexto..." : "Gerando resposta...", 
-        isProcessingContext: false 
+
+      updateThinkingMessage(assistantMessageId, {
+        content: contextContent ? "Gerando resposta com o novo contexto..." : "Gerando resposta...",
+        isProcessingContext: false
       });
 
       const conversationHistoryForAI = messages
         .filter(msg => !msg.isThinkingPlaceholder && !msg.isProcessingContext && msg.id !== assistantMessageId)
-        .slice(-6) 
+        .slice(-6)
         .map(msg => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
 
 
       const aiInput: GenerateResponseInput = {
         prompt: userMessage.content,
+        userImageInputDataUri: userMessage.imageDataUri,
         persona: aiPersona || undefined,
         rules: aiRules || undefined,
         contextContent: contextContent,
@@ -267,12 +338,13 @@ export default function ChatInterface() {
 
   const handleClearConversation = () => {
     setMessages([]);
+    clearSelectedImage();
   };
 
   const handleInputKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      if (!isLoading && inputValue.trim()) {
+      if (!isLoading && (inputValue.trim() || selectedImageFile)) {
          handleSendMessage();
       }
     }
@@ -316,17 +388,51 @@ export default function ChatInterface() {
       </ScrollArea>
 
       <div className="p-4 border-t bg-background sticky bottom-0">
-        <form onSubmit={handleSendMessage} className="flex gap-2 items-center" ref={formRef}>
+        {selectedImagePreview && (
+          <div className="mb-2 relative w-24 h-24 border rounded-md overflow-hidden shadow">
+            <Image src={selectedImagePreview} alt="Selected preview" layout="fill" objectFit="cover" />
+            <Button
+              variant="destructive"
+              size="icon"
+              className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-80 hover:opacity-100"
+              onClick={clearSelectedImage}
+              aria-label="Remover imagem selecionada"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        <form onSubmit={handleSendMessage} className="flex gap-2 items-start" ref={formRef}>
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/png, image/jpeg, image/webp, image/gif"
+            onChange={handleImageFileChange}
+            className="hidden"
+            id="imageUpload"
+            aria-label="Upload de imagem"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="rounded-full flex-shrink-0 mt-1"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading}
+            aria-label="Anexar imagem"
+          >
+            <Paperclip className="h-5 w-5 text-muted-foreground hover:text-primary" />
+          </Button>
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleInputKeyDown}
-            placeholder="Digite sua mensagem..."
+            placeholder="Digite sua mensagem ou envie uma imagem..."
             disabled={isLoading}
             className="flex-1 rounded-full px-4 py-2 focus-visible:ring-primary"
             aria-label="Message input"
           />
-          <Button type="submit" disabled={isLoading || !inputValue.trim()} size="icon" className="rounded-full bg-primary hover:bg-primary/90 disabled:bg-muted" aria-label="Send message">
+          <Button type="submit" disabled={isLoading || (!inputValue.trim() && !selectedImageFile)} size="icon" className="rounded-full bg-primary hover:bg-primary/90 disabled:bg-muted flex-shrink-0 mt-1" aria-label="Send message">
             {isLoading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
