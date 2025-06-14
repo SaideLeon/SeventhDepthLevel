@@ -62,21 +62,21 @@ When generating the text, please follow these steps:
 
         > Debatia-se então, o orgulho de ser um profissional BAD sem complexos perante as outras profissões mais afirmativas e com maior reconhecimento social, com estatutos remuneratórios mais compensadores e carreiras mais bem definidas e estruturadas. Foram tempos de mudança, de luta, em que se ganhou consciência de classe. (Queirós, 2001, pp. 1-2)
     *   **Citation of a Citation (Secondary Source - MUST BE NARRATIVE):** Transmit the idea of an author whose original work you have not read, but was cited in another source. Example: \`A pesquisa de Smith indicou... (conforme citado por Jones, 2010, p. 15).\` or \`Smith (conforme citado por Jones, 2010) argumentou que...\`.
-4.  For all images, never include any URL parameters (such as '?width=50&blur=10') in the image source. Always use only the base image URL (e.g., 'https://static.todamateria.com.br/upload/fo/to/fotossistemas.jpg') when inserting images into the Markdown using the format: ![alt text](URL). This applies to all images, including those from the technical sheet (ficha técnica) and any other source.
+4.  **Image URL Formatting - CRITICAL INSTRUCTION: For ALL images, you MUST ensure that no URL parameters (like '?width=50&blur=10', '?size=small', etc.) are included in the image source URL within the Markdown. ALWAYS use only the base image URL.** For example, if the context provides an image as 'https://static.todamateria.com.br/upload/fo/to/fotossistemas.jpg?width=50&blur=10', you MUST render it in Markdown as '![alt text](https://static.todamateria.com.br/upload/fo/to/fotossistemas.jpg)'. This rule applies to all images, including those from a technical sheet (ficha técnica) or any other source mentioned in the context.
 5.  The final output must be a single Markdown string. Ensure proper Markdown formatting for headings, paragraphs, lists, images, citations, etc.
 ---
 
 {{#if contextContent}}
 Use the following information from a web search to help answer the user's question.
 This information was retrieved from the web and should be prioritized.
-If the information seems relevant, incorporate it naturally into your response, following all formatting and citation guidelines mentioned above, especially the **CRITICAL INSTRUCTION TO PRIORITIZE NARRATIVE CITATIONS**.
+If the information seems relevant, incorporate it naturally into your response, following all formatting and citation guidelines mentioned above, especially the **CRITICAL INSTRUCTION TO PRIORITIZE NARRATIVE CITATIONS** and the **CRITICAL INSTRUCTION FOR IMAGE URL FORMATTING**.
 Context:
 {{{contextContent}}}
 
 {{#if imageInfo}}
 The search also found the following image(s) which might be relevant:
 {{{imageInfo}}}
-(You do not need to display the images or directly reference them unless it's natural to the conversation, just be aware of their existence and content if described. If you do reference an image, use the Markdown format ![alt text](URL) and adhere to the image URL formatting rules mentioned above.)
+(You do not need to display the images or directly reference them unless it's natural to the conversation, just be aware of their existence and content if described. If you do reference an image, use the Markdown format ![alt text](URL) and strictly adhere to the image URL formatting rules mentioned above, ensuring NO URL parameters.)
 {{/if}}
 ---
 {{/if}}
