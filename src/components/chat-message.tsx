@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { User, Bot, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +13,7 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   isThinkingPlaceholder?: boolean;
+  startTime?: number;
 }
 
 interface ChatMessageProps {
@@ -22,6 +23,30 @@ interface ChatMessageProps {
 
 export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) {
   const isUser = message.role === "user";
+  const [elapsedTime, setElapsedTime] = useState<number>(0);
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | undefined;
+
+    if (message.isThinkingPlaceholder && message.startTime) {
+      // Set initial elapsed time
+      setElapsedTime(Date.now() - message.startTime);
+      
+      intervalId = setInterval(() => {
+        if (message.startTime) { // Check again in case startTime becomes undefined
+          setElapsedTime(Date.now() - message.startTime);
+        }
+      }, 100); // Update every 100ms
+    } else {
+      setElapsedTime(0); // Reset if not thinking or no start time
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [message.isThinkingPlaceholder, message.startTime]);
 
   return (
     <div
@@ -47,8 +72,13 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
           {isUser ? (
             message.content
           ) : message.isThinkingPlaceholder ? (
-            <div className="flex justify-center items-center h-8">
+            <div className="flex justify-center items-center h-8 gap-2">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              {message.startTime && (
+                <span className="text-xs text-muted-foreground">
+                  ({elapsedTime} ms)
+                </span>
+              )}
             </div>
           ) : (
             <TypewriterEffect text={message.content} speed={typingSpeed} />
