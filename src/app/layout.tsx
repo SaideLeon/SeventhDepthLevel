@@ -1,6 +1,8 @@
+
 import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
+import 'highlight.js/styles/github-dark.css'; // Import highlight.js theme
 
 export const metadata: Metadata = {
   title: 'TypewriterAI',

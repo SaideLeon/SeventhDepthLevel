@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -81,4 +82,45 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Markdown specific styles */
+  .markdown-container {
+    @apply prose prose-sm dark:prose-invert max-w-none;
+  }
+  .markdown-container h1,
+  .markdown-container h2,
+  .markdown-container h3,
+  .markdown-container h4,
+  .markdown-container h5,
+  .markdown-container h6 {
+    @apply font-headline text-foreground;
+  }
+  .markdown-container p {
+    @apply text-foreground my-2; /* Reduced margin for chat context */
+  }
+  .markdown-container a {
+    @apply text-accent hover:underline;
+  }
+  .markdown-container ul,
+  .markdown-container ol {
+    @apply text-foreground list-inside my-2 pl-4;
+  }
+  .markdown-container li {
+    @apply my-0.5; /* Reduced margin for list items */
+  }
+  .markdown-container blockquote {
+    @apply border-l-4 border-muted pl-4 italic text-muted-foreground my-2;
+  }
+  .markdown-container hr {
+    @apply border-border my-4;
+  }
+  /* Inline code is handled by VSCodeCodeBlock component for consistency or custom span style */
+  .markdown-container code:not(pre > code) { /* Style for inline code */
+    @apply bg-muted text-muted-foreground px-1.5 py-0.5 rounded-sm font-mono text-xs mx-0.5;
+  }
+  /* Fenced code blocks are handled by VSCodeCodeBlock component */
+  .markdown-container pre {
+    @apply my-3; /* Keep some margin for VSCodeCodeBlock */
+  }
+
 }
