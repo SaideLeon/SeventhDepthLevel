@@ -25,7 +25,7 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
-  imageDataUri?: string; 
+  imageDataUri?: string;
   isThinkingPlaceholder?: boolean;
   startTime?: number;
   currentProcessingStepMessage?: string;
@@ -123,7 +123,7 @@ export default function ChatInterface() {
     setSelectedImageFile(null);
     setSelectedImagePreview(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""; 
+      fileInputRef.current.value = "";
     }
   };
 
@@ -178,7 +178,7 @@ export default function ChatInterface() {
     const thinkingMessage: Message = {
       id: assistantMessageId,
       role: "assistant",
-      content: "", 
+      content: "",
       isThinkingPlaceholder: true,
       startTime: Date.now(),
       currentProcessingStepMessage: "Analisando sua solicitação...",
@@ -188,13 +188,13 @@ export default function ChatInterface() {
 
     let contextContent: string | undefined = undefined;
     let imageInfo: string | undefined = undefined;
-    let flowToUse: 'simple' | 'academic' = 'academic'; 
+    let flowToUse: 'simple' | 'academic' = 'academic';
     let performSearchDecisionMade = false;
     let shouldPerformSearchBasedOnDecision = false;
-    
+
     try {
       updateThinkingMessage(assistantMessageId, { currentProcessingStepMessage: "Determinando o tipo de resposta..." });
-      
+
       let detectedQueryTypeResult: DetectQueryTypeOutput | null = null;
       if (userMessageContent || userImageDataUri) { // Only detect query type if there is some input
           const queryTypeResponse = await fetch('/api/detect-query-type', {
@@ -210,15 +210,15 @@ export default function ChatInterface() {
       }
 
 
-      if (userImageDataUri || !isSearchEnabled || detectedQueryTypeResult?.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult?.queryType === 'IMAGE_ANALYSIS') {
+      if (userImageDataUri || !isSearchEnabled || detectedQueryTypeResult?.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult?.queryType === 'IMAGE_ANALYSIS' || detectedQueryTypeResult?.queryType === 'GENERAL_CONVERSATION') {
         flowToUse = 'simple';
       } else {
-        flowToUse = 'academic'; 
+        flowToUse = 'academic';
       }
-      
+
       if (flowToUse === 'academic' && isSearchEnabled && userMessageContent) {
         updateThinkingMessage(assistantMessageId, { currentProcessingStepMessage: "Analisando a necessidade de pesquisa..." });
-        
+
         const lastTwoAIMessages = messages.filter(msg => msg.role === 'assistant' && !msg.isThinkingPlaceholder && msg.id !== assistantMessageId).slice(-2);
         const previousAiResponse1 = lastTwoAIMessages.length > 0 ? lastTwoAIMessages[lastTwoAIMessages.length - 1].content : undefined;
         const previousAiResponse2 = lastTwoAIMessages.length > 1 ? lastTwoAIMessages[0].content : undefined;
@@ -306,6 +306,12 @@ export default function ChatInterface() {
       } else if (flowToUse === 'academic' && isSearchEnabled && userMessageContent && performSearchDecisionMade && !shouldPerformSearchBasedOnDecision) {
         updateThinkingMessage(assistantMessageId, { currentProcessingStepMessage: "Pesquisa não necessária. Preparando resposta..." });
         await new Promise(resolve => setTimeout(resolve, 1000));
+      } else if (flowToUse === 'simple' && (!isSearchEnabled || (detectedQueryTypeResult?.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult?.queryType === 'GENERAL_CONVERSATION'))) {
+         updateThinkingMessage(assistantMessageId, { currentProcessingStepMessage: "Preparando uma resposta direta..." });
+         await new Promise(resolve => setTimeout(resolve, 1000));
+      } else if (flowToUse === 'simple' && userImageDataUri) {
+         updateThinkingMessage(assistantMessageId, { currentProcessingStepMessage: "Analisando a imagem..." });
+         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
 
@@ -314,7 +320,7 @@ export default function ChatInterface() {
 
       const conversationHistoryForAI = messages
         .filter(msg => !msg.isThinkingPlaceholder && msg.id !== assistantMessageId && msg.id !== userMessage.id)
-        .slice(-6) 
+        .slice(-6)
         .map(msg => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
 
 
@@ -330,10 +336,10 @@ export default function ChatInterface() {
         };
         const simpleResult: GenerateSimpleResponseOutput = await generateSimpleResponse(simpleInput);
         aiResultText = simpleResult.response;
-      } else { 
+      } else {
         const academicInput: GenerateAcademicResponseInput = {
           prompt: userMessage.content,
-          userImageInputDataUri: userMessage.imageDataUri, 
+          userImageInputDataUri: userMessage.imageDataUri,
           persona: aiPersona || undefined,
           rules: aiRules || undefined,
           contextContent: contextContent,
@@ -394,7 +400,7 @@ export default function ChatInterface() {
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
-      <header className="p-4 border-b flex justify-between items-center shadow-sm sticky top-0 bg-background z-10">
+      <header className="p-3 border-b flex justify-between items-center shadow-sm sticky top-0 bg-background z-10">
         <h1 className="text-2xl font-headline font-semibold text-primary">Cabulador</h1>
         <div className="flex items-center gap-2">
           <ThemeToggleButton />
