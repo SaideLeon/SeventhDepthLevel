@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import 'highlight.js/styles/github-dark.css'; // Import highlight.js theme
 
 export const metadata: Metadata = {
-  title: 'SeventhDepthLevel',
+  title: 'Cabulador',
   description: 'A ChatGPT clone with a typewriter effect.',
 };
 

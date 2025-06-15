@@ -31,10 +31,10 @@ interface Message {
   currentProcessingStepMessage?: string;
 }
 
-const TYPING_SPEED_STORAGE_KEY = "seventhdepthlevel_typing_speed";
-const AI_PERSONA_STORAGE_KEY = "seventhdepthlevel_persona";
-const AI_RULES_STORAGE_KEY = "seventhdepthlevel_rules";
-const SEARCH_ENABLED_STORAGE_KEY = "seventhdepthlevel_search_enabled";
+const TYPING_SPEED_STORAGE_KEY = "cabulador_typing_speed";
+const AI_PERSONA_STORAGE_KEY = "cabulador_persona";
+const AI_RULES_STORAGE_KEY = "cabulador_rules";
+const SEARCH_ENABLED_STORAGE_KEY = "cabulador_search_enabled";
 
 
 export default function ChatInterface() {
@@ -178,7 +178,7 @@ export default function ChatInterface() {
     const thinkingMessage: Message = {
       id: assistantMessageId,
       role: "assistant",
-      content: "", // Initial content will be set by currentProcessingStepMessage
+      content: "", 
       isThinkingPlaceholder: true,
       startTime: Date.now(),
       currentProcessingStepMessage: "Analisando sua solicitação...",
@@ -188,38 +188,34 @@ export default function ChatInterface() {
 
     let contextContent: string | undefined = undefined;
     let imageInfo: string | undefined = undefined;
-    let flowToUse: 'simple' | 'academic' = 'academic';
+    let flowToUse: 'simple' | 'academic' = 'academic'; 
     let performSearchDecisionMade = false;
     let shouldPerformSearchBasedOnDecision = false;
     
     try {
-      // 1. Determine which flow to use
       updateThinkingMessage(assistantMessageId, { currentProcessingStepMessage: "Determinando o tipo de resposta..." });
-      if (userImageDataUri) {
-        flowToUse = 'simple';
-      } else if (!isSearchEnabled) {
+      
+      let detectedQueryTypeResult: DetectQueryTypeOutput | null = null;
+      if (userMessageContent || userImageDataUri) { // Only detect query type if there is some input
+          const queryTypeResponse = await fetch('/api/detect-query-type', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentUserQuery: userMessageContent, userImageProvided: !!userImageDataUri }),
+          });
+          if (!queryTypeResponse.ok) {
+            const errorData = await queryTypeResponse.json();
+            throw new Error(`Falha ao detectar o tipo de consulta: ${errorData.error || queryTypeResponse.statusText}`);
+          }
+          detectedQueryTypeResult = await queryTypeResponse.json();
+      }
+
+
+      if (userImageDataUri || !isSearchEnabled || detectedQueryTypeResult?.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult?.queryType === 'IMAGE_ANALYSIS') {
         flowToUse = 'simple';
       } else {
-        // Search is enabled and no user image, so detect query type
-        const queryTypeResponse = await fetch('/api/detect-query-type', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ currentUserQuery: userMessageContent, userImageProvided: !!userImageDataUri }),
-        });
-        if (!queryTypeResponse.ok) {
-          const errorData = await queryTypeResponse.json();
-          throw new Error(`Falha ao detectar o tipo de consulta: ${errorData.error || queryTypeResponse.statusText}`);
-        }
-        const queryTypeResult: DetectQueryTypeOutput = await queryTypeResponse.json();
-        
-        if (queryTypeResult.queryType === 'CODING_TECHNICAL' || queryTypeResult.queryType === 'IMAGE_ANALYSIS') {
-          flowToUse = 'simple';
-        } else {
-          flowToUse = 'academic'; // ACADEMIC_RESEARCH or GENERAL_CONVERSATION with search enabled
-        }
+        flowToUse = 'academic'; 
       }
       
-      // 2. If using academic flow and search is enabled, decide if search is needed
       if (flowToUse === 'academic' && isSearchEnabled && userMessageContent) {
         updateThinkingMessage(assistantMessageId, { currentProcessingStepMessage: "Analisando a necessidade de pesquisa..." });
         
@@ -246,7 +242,6 @@ export default function ChatInterface() {
         performSearchDecisionMade = true;
       }
 
-      // 3. Perform search if applicable (academic flow, search enabled, text query, and decision was SEARCH_NEEDED)
       if (flowToUse === 'academic' && isSearchEnabled && userMessageContent && performSearchDecisionMade && shouldPerformSearchBasedOnDecision) {
           updateThinkingMessage(assistantMessageId, { currentProcessingStepMessage: "Detectando o tópico para pesquisa..." });
           const topicResponse = await fetch('/api/detect-topic', {
@@ -314,14 +309,14 @@ export default function ChatInterface() {
       }
 
 
-      // 4. Generate response using the chosen flow
       const finalStepMessage = contextContent ? "Gerando resposta com o novo contexto..." : "Gerando resposta...";
       updateThinkingMessage(assistantMessageId, { currentProcessingStepMessage: finalStepMessage });
 
       const conversationHistoryForAI = messages
-        .filter(msg => !msg.isThinkingPlaceholder && msg.id !== assistantMessageId)
-        .slice(-6)
+        .filter(msg => !msg.isThinkingPlaceholder && msg.id !== assistantMessageId && msg.id !== userMessage.id)
+        .slice(-6) 
         .map(msg => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
+
 
       let aiResultText: string;
 
@@ -335,10 +330,10 @@ export default function ChatInterface() {
         };
         const simpleResult: GenerateSimpleResponseOutput = await generateSimpleResponse(simpleInput);
         aiResultText = simpleResult.response;
-      } else { // academic flow
+      } else { 
         const academicInput: GenerateAcademicResponseInput = {
           prompt: userMessage.content,
-          userImageInputDataUri: userMessage.imageDataUri, // Pass user image to academic flow too
+          userImageInputDataUri: userMessage.imageDataUri, 
           persona: aiPersona || undefined,
           rules: aiRules || undefined,
           contextContent: contextContent,
@@ -400,7 +395,7 @@ export default function ChatInterface() {
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
       <header className="p-4 border-b flex justify-between items-center shadow-sm sticky top-0 bg-background z-10">
-        <h1 className="text-2xl font-headline font-semibold text-primary">SeventhDepthLevel</h1>
+        <h1 className="text-2xl font-headline font-semibold text-primary">Cabulador</h1>
         <div className="flex items-center gap-2">
           <ThemeToggleButton />
           <SettingsPopover
@@ -491,5 +486,3 @@ export default function ChatInterface() {
     </div>
   );
 }
-
-    
