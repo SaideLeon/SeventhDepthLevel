@@ -20,6 +20,7 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarTrigger,
+  SidebarContent, // Added import for SidebarContent
 } from "@/components/ui/sidebar";
 
 
@@ -216,35 +217,35 @@ export default function ChatInterface() {
     sessionId: string,
     thinkingMessageId: string,
     finalMessageContent: string,
-    userFirstMessageForTitle?: Message
   ) => {
-    let sessionAfterMessageUpdate: ChatSession | undefined;
+    let sessionForTitleUpdate: ChatSession | undefined;
 
     setSessions(prevSessions => {
       const newSessions = prevSessions.map(session => {
         if (session.id === sessionId) {
           const updatedMessages = session.messages.map(msg =>
             msg.id === thinkingMessageId
-              ? { ...msg, content: finalMessageContent, isThinkingPlaceholder: false, startTime: undefined, currentProcessingStepMessage: undefined, applyTypewriter: true } // Set applyTypewriter to true for new AI message
+              ? { ...msg, content: finalMessageContent, isThinkingPlaceholder: false, startTime: undefined, currentProcessingStepMessage: undefined, applyTypewriter: true }
               : msg
           );
-          sessionAfterMessageUpdate = { 
+          sessionForTitleUpdate = { 
             ...session,
             messages: updatedMessages,
             lastUpdatedAt: Date.now(),
-            hasAiGeneratedTitle: session.hasAiGeneratedTitle || false, // Preserve existing value
+            hasAiGeneratedTitle: session.hasAiGeneratedTitle || false,
           };
-          return sessionAfterMessageUpdate;
+          return sessionForTitleUpdate;
         }
         return session;
       }).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt);
       return newSessions;
     });
 
-    if (sessionAfterMessageUpdate && !sessionAfterMessageUpdate.hasAiGeneratedTitle && userFirstMessageForTitle) {
-        const firstAIMessageForTitle = sessionAfterMessageUpdate.messages.find(m => m.id === thinkingMessageId && m.role === 'assistant');
+    if (sessionForTitleUpdate && !sessionForTitleUpdate.hasAiGeneratedTitle) {
+        const userFirstMessageForTitle = sessionForTitleUpdate.messages.find(m => m.role === 'user');
+        const firstAIMessageForTitle = sessionForTitleUpdate.messages.find(m => m.id === thinkingMessageId && m.role === 'assistant');
 
-        if (firstAIMessageForTitle && firstAIMessageForTitle.content) {
+        if (userFirstMessageForTitle && firstAIMessageForTitle && firstAIMessageForTitle.content) {
             try {
                 const titleResponse = await fetch('/api/generate-session-title', {
                     method: 'POST',
@@ -507,8 +508,7 @@ export default function ChatInterface() {
         aiResultText = academicResult.response;
       }
       
-      const firstUserMessageInSession = activeSessionMessagesForAI.find(m => m.role === 'user');
-      await replaceThinkingWithMessageInSession(currentSessionId, assistantMessageId, aiResultText, firstUserMessageInSession);
+      await replaceThinkingWithMessageInSession(currentSessionId, assistantMessageId, aiResultText);
 
     } catch (error) {
       console.error("Error in AI response generation pipeline:", error);
@@ -548,7 +548,7 @@ export default function ChatInterface() {
           </Button>
         </SidebarHeader>
         <ScrollArea className="flex-1 min-h-0">
-          <div className="p-1 pt-0">
+          <div className="p-1 pt-0 h-full"> {/* Added h-full here */}
             <SidebarMenu>
               {sortedSessions.map((session) => (
                 <SidebarMenuItem key={session.id}>
