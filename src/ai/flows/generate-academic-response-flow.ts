@@ -124,10 +124,12 @@ const generateAcademicResponseFlow = ai.defineFlow(
     inputSchema: GenerateAcademicResponseInputSchema,
     outputSchema: GenerateAcademicResponseOutputSchema,
   },
-  async input => {
+  async (input): Promise<GenerateAcademicResponseOutput> => {
     const {output} = await generateAcademicResponsePrompt(input);
-    return output!;
+    if (!output) {
+      console.error(`Flow ${generateAcademicResponsePrompt.name} returned null output for input:`, input);
+      throw new Error(`AI model did not produce the expected output structure for ${generateAcademicResponsePrompt.name}.`);
+    }
+    return output;
   }
 );
-
-    

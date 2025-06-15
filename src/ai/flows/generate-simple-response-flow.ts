@@ -72,10 +72,12 @@ const generateSimpleResponseFlow = ai.defineFlow(
     inputSchema: GenerateSimpleResponseInputSchema,
     outputSchema: GenerateSimpleResponseOutputSchema,
   },
-  async input => {
+  async (input): Promise<GenerateSimpleResponseOutput> => {
     const {output} = await generateSimpleResponsePrompt(input);
-    return output!;
+    if (!output) {
+      console.error(`Flow ${generateSimpleResponsePrompt.name} returned null output for input:`, input);
+      throw new Error(`AI model did not produce the expected output structure for ${generateSimpleResponsePrompt.name}.`);
+    }
+    return output;
   }
 );
-
-    
