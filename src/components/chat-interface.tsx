@@ -15,7 +15,6 @@ import {
   SidebarProvider,
   Sidebar,
   SidebarHeader,
-  SidebarContent,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
@@ -233,6 +232,7 @@ export default function ChatInterface() {
             ...session,
             messages: updatedMessages,
             lastUpdatedAt: Date.now(),
+            hasAiGeneratedTitle: session.hasAiGeneratedTitle || false, // Preserve existing value
           };
           return sessionAfterMessageUpdate;
         }
@@ -548,7 +548,7 @@ export default function ChatInterface() {
           </Button>
         </SidebarHeader>
         <ScrollArea className="flex-1">
-          <SidebarContent className="p-1 pt-0">
+          <div className="p-1 pt-0">
             <SidebarMenu>
               {sortedSessions.map((session) => (
                 <SidebarMenuItem key={session.id}>
@@ -567,7 +567,7 @@ export default function ChatInterface() {
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
-          </SidebarContent>
+          </div>
         </ScrollArea>
       </Sidebar>
 
@@ -637,4 +637,6 @@ export default function ChatInterface() {
     </SidebarProvider>
   );
 }
+    
+
     
