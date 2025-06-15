@@ -324,7 +324,7 @@ export default function ChatInterface() {
 
     let contextContent: string | undefined = undefined;
     let imageInfo: string | undefined = undefined;
-    let flowToUse: 'simple' | 'academic' = 'academic';
+    let flowToUse: 'simple' | 'academic' = 'academic'; // Default to academic
     let performSearchDecisionMade = false;
     let shouldPerformSearchBasedOnDecision = false;
 
@@ -332,7 +332,8 @@ export default function ChatInterface() {
       updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Determinando o tipo de resposta..." });
 
       let detectedQueryTypeResult: DetectQueryTypeOutput | null = null;
-      if (userMessageContent || userImageDataUri || isSearchEnabled) {
+      // Only call detectQueryType if there's text or search is generally enabled for text-based queries
+      if (userMessageContent || userImageDataUri || isSearchEnabled) { // Broad condition to ensure it runs if relevant
           const queryTypeResponse = await fetch('/api/detect-query-type', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ currentUserQuery: userMessageContent, userImageProvided: !!userImageDataUri }),
@@ -344,12 +345,14 @@ export default function ChatInterface() {
           detectedQueryTypeResult = await queryTypeResponse.json();
       }
 
-      if (userImageDataUri || !isSearchEnabled || detectedQueryTypeResult?.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult?.queryType === 'IMAGE_ANALYSIS' || detectedQueryTypeResult?.queryType === 'GENERAL_CONVERSATION') {
+      // Determine flow based on query type, image presence, or search setting
+      if (userImageDataUri || !isSearchEnabled || (detectedQueryTypeResult && (detectedQueryTypeResult.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult.queryType === 'IMAGE_ANALYSIS' || detectedQueryTypeResult.queryType === 'GENERAL_CONVERSATION'))) {
         flowToUse = 'simple';
       } else {
         flowToUse = 'academic';
       }
 
+      // Logic for search decision and execution (only if academic flow and search is enabled and there's text)
       if (flowToUse === 'academic' && isSearchEnabled && userMessageContent) {
         updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Analisando a necessidade de pesquisa..." });
         
@@ -368,9 +371,11 @@ export default function ChatInterface() {
         }
         const decisionResult: DecideSearchNecessityOutput = await decisionResponse.json();
         shouldPerformSearchBasedOnDecision = decisionResult.decision === "SEARCH_NEEDED";
-        performSearchDecisionMade = true;
+        performSearchDecisionMade = true; // Mark that a decision was made
       }
 
+
+      // Perform search if academic flow, enabled, text query, and decision was to search
       if (flowToUse === 'academic' && isSearchEnabled && userMessageContent && performSearchDecisionMade && shouldPerformSearchBasedOnDecision) {
           updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Detectando o tópico para pesquisa..." });
           const topicResponse = await fetch('/api/detect-topic', {
@@ -413,31 +418,35 @@ export default function ChatInterface() {
                 if (aggregatedImageInfo.length > 0) imageInfo = `Imagens encontradas que podem ser relevantes: ${aggregatedImageInfo.join('; ')}`;
               } else {
                  updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: `Nenhum conteúdo de artigo encontrado para "${detectedTopic}". Prosseguindo com conhecimento geral...` });
-                 await new Promise(resolve => setTimeout(resolve, 1500));
+                 await new Promise(resolve => setTimeout(resolve, 1500)); // Brief pause
               }
             } else {
                updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: `Nenhum artigo relevante encontrado para "${detectedTopic}". Prosseguindo com conhecimento geral...` });
-               await new Promise(resolve => setTimeout(resolve, 1500));
+               await new Promise(resolve => setTimeout(resolve, 1500)); // Brief pause
             }
           }
       } else if (flowToUse === 'academic' && isSearchEnabled && userMessageContent && performSearchDecisionMade && !shouldPerformSearchBasedOnDecision) {
+        // Search was decided against
         updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Pesquisa não necessária. Preparando resposta..." });
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } else if (flowToUse === 'simple' && ( !isSearchEnabled || (detectedQueryTypeResult?.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult?.queryType === 'GENERAL_CONVERSATION') ) ) {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Brief pause
+      } else if (flowToUse === 'simple' && ( !isSearchEnabled || (detectedQueryTypeResult && (detectedQueryTypeResult.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult.queryType === 'GENERAL_CONVERSATION')) ) ) {
+         // Direct simple response (no search path)
          updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Preparando uma resposta direta..." });
-         await new Promise(resolve => setTimeout(resolve, 1000));
-      } else if (flowToUse === 'simple' && userImageDataUri) {
+         await new Promise(resolve => setTimeout(resolve, 1000)); // Brief pause
+      } else if (flowToUse === 'simple' && userImageDataUri) { // Image analysis via simple flow
          updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Analisando a imagem..." });
-         await new Promise(resolve => setTimeout(resolve, 1000));
+         await new Promise(resolve => setTimeout(resolve, 1000)); // Brief pause
       }
+
 
       const finalStepMessage = contextContent ? "Gerando resposta com o novo contexto..." : "Gerando resposta...";
       updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: finalStepMessage });
 
+      // Prepare conversation history for AI
       const activeSessionMessagesForAI = sessions.find(s => s.id === currentSessionId)?.messages || [];
       const conversationHistoryForAI = activeSessionMessagesForAI
-        .filter(msg => !msg.isThinkingPlaceholder && msg.id !== assistantMessageId && msg.id !== userMessage.id)
-        .slice(-6)
+        .filter(msg => !msg.isThinkingPlaceholder && msg.id !== assistantMessageId && msg.id !== userMessage.id) // Exclude current thinking and user message
+        .slice(-6) // Take last 6 relevant messages
         .map(msg => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
 
       let aiResultText: string;
@@ -449,7 +458,7 @@ export default function ChatInterface() {
         };
         const simpleResult: GenerateSimpleResponseOutput = await generateSimpleResponse(simpleInput);
         aiResultText = simpleResult.response;
-      } else {
+      } else { // 'academic' flow
         const academicInput: GenerateAcademicResponseInput = {
           prompt: userMessage.content, userImageInputDataUri: userMessage.imageDataUri,
           persona: aiPersona || undefined, rules: aiRules || undefined,
@@ -512,7 +521,7 @@ export default function ChatInterface() {
                         "w-full text-left justify-start group-data-[collapsible=icon]:justify-center",
                         {"bg-sidebar-accent text-sidebar-accent-foreground": session.id === activeSessionId}
                     )}
-                    tooltip={{children: session.title, side: "right", align:"center", className:"group-data-[collapsible=icon]:block hidden"}}
+                    tooltip={{children: session.title, side: "right", align:"center"}}
                   >
                     <MessageSquareText className="h-4 w-4 text-muted-foreground group-data-[collapsible=icon]:text-inherit" />
                     <span className="truncate group-data-[collapsible=icon]:hidden">{session.title}</span>
@@ -590,4 +599,3 @@ export default function ChatInterface() {
     </SidebarProvider>
   );
 }
-
