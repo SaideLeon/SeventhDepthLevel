@@ -19,10 +19,10 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
-  imageDataUri?: string; // For user-uploaded images
+  imageDataUri?: string;
   isThinkingPlaceholder?: boolean;
   startTime?: number;
-  isProcessingContext?: boolean;
+  currentProcessingStepMessage?: string; // Changed from isProcessingContext
 }
 
 interface ChatMessageProps {
@@ -40,7 +40,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | undefined;
 
-    if ((message.isThinkingPlaceholder || message.isProcessingContext) && message.startTime) {
+    if (message.isThinkingPlaceholder && message.startTime) { // Now only depends on isThinkingPlaceholder for timer
       setElapsedTime(Date.now() - message.startTime);
       intervalId = setInterval(() => {
         if (message.startTime) {
@@ -56,16 +56,16 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
         clearInterval(intervalId);
       }
     };
-  }, [message.isThinkingPlaceholder, message.isProcessingContext, message.startTime]);
+  }, [message.isThinkingPlaceholder, message.startTime]);
 
   useEffect(() => {
-    if (message.role === "assistant" && !message.isThinkingPlaceholder && !message.isProcessingContext) {
+    if (message.role === "assistant" && !message.isThinkingPlaceholder) {
       setIsTypingComplete(false);
     }
-    if (isUser || message.isThinkingPlaceholder || message.isProcessingContext) {
+    if (isUser || message.isThinkingPlaceholder) {
         setIsTypingComplete(true);
     }
-  }, [message.content, message.role, isUser, message.isThinkingPlaceholder, message.isProcessingContext]);
+  }, [message.content, message.role, isUser, message.isThinkingPlaceholder]);
 
 
   const handleTypingComplete = () => {
@@ -74,13 +74,13 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
 
   const handleCopyText = async () => {
     if (!message.content && !message.imageDataUri) return;
-    // For now, only copy text content. Image copy is complex.
+    
     if (!message.content) {
         toast({
             title: "Apenas Imagem",
-            description: "A funcionalidade de copiar imagem ainda não está implementada. O texto foi copiado.",
+            description: "A funcionalidade de copiar imagem ainda não está implementada. O texto (se houver) foi copiado.",
         });
-        if (!message.content) return; // if truly no text
+        if (!message.content) return; 
     }
 
     try {
@@ -132,7 +132,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
                 />
             );
           },
-           img: ({ node, ...props }) => ( // For AI-returned Markdown images
+           img: ({ node, ...props }) => ( 
             <span className="block my-3 rounded-lg overflow-hidden border shadow-sm">
               <Image
                 src={props.src || "https://placehold.co/600x400.png"}
@@ -166,19 +166,19 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
 
     if (isUser) {
       return (
-        <>
+        <div className="flex flex-col"> {/* Ensure content and image are in a column for user */}
           {userImageElement}
           {message.content && markdownContent}
           {!message.content && userImageElement && <span className="text-muted-foreground italic text-xs">(Imagem enviada)</span>}
-        </>
+        </div>
       );
     }
 
-    if (message.isThinkingPlaceholder || message.isProcessingContext) {
+    if (message.isThinkingPlaceholder) {
       return (
         <div className="flex flex-col items-center justify-center h-auto p-2 gap-2">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          <span className="text-xs text-muted-foreground text-center">{message.content || "Processando..."}</span>
+          <span className="text-xs text-muted-foreground text-center">{message.currentProcessingStepMessage || "Processando..."}</span>
           {message.startTime && (
             <span className="text-xs text-muted-foreground">
               ({elapsedTime} ms)
@@ -210,17 +210,17 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
           </AvatarFallback>
         </Avatar>
       )}
-      <div className="flex flex-col">
+      <div className={cn("flex flex-col", { "items-end": isUser })}> {/* This div controls alignment of card within the row */}
         <Card
           className={cn(
             "max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl shadow-md rounded-xl",
             isUser ? "bg-primary text-primary-foreground" : "bg-card relative"
           )}
         >
-          <CardContent className={cn("p-3 text-sm break-words", {"prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2": (isTypingComplete || isUser) && !message.isThinkingPlaceholder && !message.isProcessingContext })}>
+          <CardContent className={cn("p-3 text-sm break-words", {"prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2": (isTypingComplete || isUser) && !message.isThinkingPlaceholder })}>
             {renderContent()}
           </CardContent>
-          {!isUser && isTypingComplete && !message.isThinkingPlaceholder && !message.isProcessingContext && message.content && (
+          {!isUser && isTypingComplete && !message.isThinkingPlaceholder && message.content && (
             <Button
               variant="ghost"
               size="icon"
@@ -232,7 +232,6 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
             </Button>
           )}
         </Card>
-
       </div>
       {isUser && (
          <Avatar className="h-8 w-8 self-start shadow-sm">
@@ -244,3 +243,5 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
     </div>
   );
 }
+
+    
