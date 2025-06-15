@@ -28,6 +28,7 @@ import { generateAcademicResponse, type GenerateAcademicResponseOutput, type Gen
 import { generateSimpleResponse, type GenerateSimpleResponseOutput, type GenerateSimpleResponseInput } from "@/ai/flows/generate-simple-response-flow";
 import type { DetectTopicFromTextOutput } from "@/ai/flows/detect-topic-flow";
 import type { DetectQueryTypeOutput } from "@/ai/flows/detect-query-type-flow";
+import type { GenerateSessionTitleOutput } from "@/ai/flows/generate-session-title-flow";
 
 import type { SearchResult, PageContent } from "@/utils/raspagem";
 import { useToast } from "@/hooks/use-toast";
@@ -49,6 +50,7 @@ interface ChatSession {
   messages: Message[];
   createdAt: number;
   lastUpdatedAt: number;
+  hasAiGeneratedTitle?: boolean; // New flag
 }
 
 const TYPING_SPEED_STORAGE_KEY = "cabulador_typing_speed";
@@ -102,6 +104,7 @@ export default function ChatInterface() {
       messages: [],
       createdAt: Date.now(),
       lastUpdatedAt: Date.now(),
+      hasAiGeneratedTitle: false, // Initialize new flag
     };
     setSessions(prev => [newSession, ...prev.sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt)]);
     setActiveSessionId(newSessionId);
@@ -119,6 +122,8 @@ export default function ChatInterface() {
     if (storedSessions) {
       try {
         loadedSessions = JSON.parse(storedSessions);
+        // Ensure all sessions have the hasAiGeneratedTitle flag
+        loadedSessions = loadedSessions.map(s => ({...s, hasAiGeneratedTitle: s.hasAiGeneratedTitle || false}));
       } catch (e) {
         console.error("Failed to parse sessions from localStorage", e);
         loadedSessions = [];
@@ -155,10 +160,11 @@ export default function ChatInterface() {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, [sessions, activeSessionId]); // Trigger scroll on active session change or message update
+  }, [sessions, activeSessionId]); 
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
   const currentMessages = activeSession?.messages || [];
+
 
   const updateSessionMessages = (sessionId: string, newMessages: Message[], thinkingMessageIdToRemove?: string) => {
     setSessions(prevSessions =>
@@ -199,14 +205,13 @@ export default function ChatInterface() {
               messages: session.messages.map(msg =>
                 msg.id === thinkingMessageId ? { ...msg, ...updates } : msg
               ),
-              // Not updating lastUpdatedAt here as it's a transient message update
             }
           : session
-      ) // No re-sort needed for thinking message updates
+      ) 
     );
   };
 
-  const replaceThinkingWithMessageInSession = (sessionId: string, thinkingMessageId: string, finalMessageContent: string) => {
+  const replaceThinkingWithMessageInSession = async (sessionId: string, thinkingMessageId: string, finalMessageContent: string, userFirstMessageForTitle?: Message) => {
      setSessions(prevSessions =>
       prevSessions.map(session =>
         session.id === sessionId
@@ -222,6 +227,42 @@ export default function ChatInterface() {
           : session
       ).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt)
     );
+
+    // AI Title Generation Logic
+    const currentSession = sessions.find(s => s.id === sessionId);
+    if (currentSession && !currentSession.hasAiGeneratedTitle && userFirstMessageForTitle) {
+        const assistantMessages = currentSession.messages.filter(m => m.role === 'assistant' && !m.isThinkingPlaceholder && m.id !== thinkingMessageId);
+        const firstAIMessage = assistantMessages.length > 0 ? assistantMessages[0] : {id: thinkingMessageId, role: 'assistant', content: finalMessageContent} as Message;
+
+        if (firstAIMessage && firstAIMessage.content) { // Ensure AI has responded with content
+            try {
+                const titleResponse = await fetch('/api/generate-session-title', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userFirstMessageContent: userFirstMessageForTitle.content,
+                        aiFirstResponseContent: firstAIMessage.content,
+                    }),
+                });
+                if (titleResponse.ok) {
+                    const titleResult: GenerateSessionTitleOutput = await titleResponse.json();
+                    if (titleResult.generatedTitle) {
+                        setSessions(prev =>
+                            prev.map(s =>
+                                s.id === sessionId
+                                    ? { ...s, title: titleResult.generatedTitle, hasAiGeneratedTitle: true, lastUpdatedAt: Date.now() }
+                                    : s
+                            ).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt)
+                        );
+                    }
+                } else {
+                    console.warn("Failed to generate AI session title:", await titleResponse.text());
+                }
+            } catch (error) {
+                console.error("Error calling generate session title API:", error);
+            }
+        }
+    }
   };
 
   const handleImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -294,15 +335,15 @@ export default function ChatInterface() {
     };
     addMessageToSession(currentSessionId, userMessage);
     
-    const currentSessionForTitle = sessions.find(s => s.id === currentSessionId);
-    if (currentSessionForTitle && currentSessionForTitle.title.startsWith("Nova Conversa") && currentSessionForTitle.messages.filter(m => m.role === 'user').length === 1) {
-        let newTitle = "Conversa";
+    const sessionForTitleUpdate = sessions.find(s => s.id === currentSessionId);
+    if (sessionForTitleUpdate && !sessionForTitleUpdate.hasAiGeneratedTitle && sessionForTitleUpdate.title.startsWith("Nova Conversa")) {
+        // This is a temporary title. AI title generation will happen after AI's first response.
         if (userMessageContent) {
-            newTitle = userMessageContent.substring(0, 30) + (userMessageContent.length > 30 ? "..." : "");
+            const tempTitle = userMessageContent.substring(0, 30) + (userMessageContent.length > 30 ? "..." : "");
+            setSessions(prev => prev.map(s => s.id === currentSessionId ? {...s, title: tempTitle, lastUpdatedAt: Date.now()} : s).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt));
         } else if (userImageDataUri) {
-            newTitle = "Conversa com Imagem";
+            setSessions(prev => prev.map(s => s.id === currentSessionId ? {...s, title: "Conversa com Imagem", lastUpdatedAt: Date.now()} : s).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt));
         }
-         setSessions(prev => prev.map(s => s.id === currentSessionId ? {...s, title: newTitle, lastUpdatedAt: Date.now()} : s).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt));
     }
 
 
@@ -444,8 +485,9 @@ export default function ChatInterface() {
         const academicResult: GenerateAcademicResponseOutput = await generateAcademicResponse(academicInput);
         aiResultText = academicResult.response;
       }
-
-      replaceThinkingWithMessageInSession(currentSessionId, assistantMessageId, aiResultText);
+      
+      const firstUserMessageInSession = activeSessionMessagesForAI.find(m => m.role === 'user');
+      await replaceThinkingWithMessageInSession(currentSessionId, assistantMessageId, aiResultText, firstUserMessageInSession);
 
     } catch (error) {
       console.error("Error in AI response generation pipeline:", error);
@@ -457,7 +499,7 @@ export default function ChatInterface() {
         else if (error.message.includes("fetch article content")) errorDescription = "Falha ao buscar conteúdo do artigo.";
       }
       toast({ title: "Erro", description: errorDescription, variant: "destructive" });
-      replaceThinkingWithMessageInSession(currentSessionId, assistantMessageId, "Desculpe, não consegui processar sua solicitação.");
+      await replaceThinkingWithMessageInSession(currentSessionId, assistantMessageId, "Desculpe, não consegui processar sua solicitação.");
     } finally {
       setIsLoading(false);
     }
