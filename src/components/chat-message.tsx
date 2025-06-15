@@ -22,7 +22,7 @@ interface Message {
   imageDataUri?: string;
   isThinkingPlaceholder?: boolean;
   startTime?: number;
-  currentProcessingStepMessage?: string; // Changed from isProcessingContext
+  currentProcessingStepMessage?: string;
 }
 
 interface ChatMessageProps {
@@ -40,7 +40,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | undefined;
 
-    if (message.isThinkingPlaceholder && message.startTime) { // Now only depends on isThinkingPlaceholder for timer
+    if (message.isThinkingPlaceholder && message.startTime) {
       setElapsedTime(Date.now() - message.startTime);
       intervalId = setInterval(() => {
         if (message.startTime) {
@@ -102,19 +102,28 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          pre: ({ node, ...props }) => {
-            const codeNode = props.children?.[0] as React.ReactElement;
-            let codeString = "";
-            let language = "plaintext";
-            if (codeNode && codeNode.type === 'code') {
-              if (codeNode.props.className) {
-                language = codeNode.props.className.replace('language-', '');
+          pre: ({ node, children, ...props }) => {
+            if (children && Array.isArray(children) && children.length > 0) {
+              const codeElement = children[0] as React.ReactElement;
+              if (codeElement && codeElement.type === 'code' && codeElement.props) {
+                const { className, children: codeContentNode } = codeElement.props;
+                const language = className?.replace(/^language-/, '') || 'plaintext';
+                
+                let finalCodeString = '';
+                if (Array.isArray(codeContentNode)) {
+                  finalCodeString = codeContentNode.map(String).join('');
+                } else if (codeContentNode !== null && codeContentNode !== undefined) {
+                  finalCodeString = String(codeContentNode);
+                }
+                finalCodeString = finalCodeString.replace(/\n$/, '');
+
+                const filename = language !== 'plaintext' && language !== '' ? `code.${language}` : undefined;
+
+                return <VSCodeCodeBlock language={language} code={finalCodeString} filename={filename} />;
               }
-              codeString = String(codeNode.props.children).replace(/\n$/, '');
-              return <VSCodeCodeBlock language={language} code={codeString} />;
             }
-            codeString = String(props.children).replace(/\n$/, '');
-            return <VSCodeCodeBlock language={language} code={codeString} />;
+            // Fallback for unexpected structure or simple pre tags without a nested code
+            return <pre {...props} className="bg-muted p-2 rounded-md overflow-x-auto my-2 text-sm">{children}</pre>; 
           },
           code({ node, inline, className, children, ...props }) {
             if (inline) {
@@ -124,13 +133,13 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
                 </code>
               );
             }
+            // For non-inline code that's NOT inside a <pre> (should be rare with remarkGfm for fenced blocks)
+            // This case is typically handled by the `pre` component above for fenced code blocks.
+            // If it reaches here, it might be a standalone <code> block not wrapped by <pre>.
             const match = /language-(\w+)/.exec(className || '');
-            return (
-               <VSCodeCodeBlock
-                  language={match ? match[1] : 'plaintext'}
-                  code={String(children).replace(/\n$/, '')}
-                />
-            );
+            const lang = match ? match[1] : 'plaintext';
+            const codeString = Array.isArray(children) ? children.join('') : String(children);
+            return <VSCodeCodeBlock language={lang} code={codeString.replace(/\n$/, '')} filename={lang !== 'plaintext' ? `code.${lang}`: undefined}/>;
           },
            img: ({ node, ...props }) => ( 
             <span className="block my-3 rounded-lg overflow-hidden border shadow-sm">
@@ -166,7 +175,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
 
     if (isUser) {
       return (
-        <div className="flex flex-col"> {/* Ensure content and image are in a column for user */}
+        <div className="flex flex-col">
           {userImageElement}
           {message.content && markdownContent}
           {!message.content && userImageElement && <span className="text-muted-foreground italic text-xs">(Imagem enviada)</span>}
@@ -210,11 +219,11 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
           </AvatarFallback>
         </Avatar>
       )}
-      <div className={cn("flex flex-col", { "items-end": isUser })}> {/* This div controls alignment of card within the row */}
+      <div className={cn("flex flex-col", { "items-end": isUser })}>
         <Card
           className={cn(
             "max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl shadow-md rounded-xl",
-            isUser ? "bg-primary text-primary-foreground" : "bg-card relative"
+            isUser ? "bg-primary text-primary-foreground" : "bg-card relative" 
           )}
         >
           <CardContent className={cn("p-3 text-sm break-words", {"prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2": (isTypingComplete || isUser) && !message.isThinkingPlaceholder })}>
@@ -243,5 +252,3 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
     </div>
   );
 }
-
-    

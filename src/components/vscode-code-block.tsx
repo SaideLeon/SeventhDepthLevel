@@ -12,53 +12,51 @@ interface VSCodeCodeBlockProps {
   filename?: string;
   language?: string;
   code?: string;
-  className?: string; // To catch the className prop from react-markdown
-  children?: React.ReactNode; // To catch children if passed differently
-  inline?: boolean; // To catch inline prop from react-markdown
-  node?: any; // To catch node prop from react-markdown
+  // Props below are to catch them if passed by react-markdown, but not directly used if `code` and `language` are provided.
+  className?: string; 
+  children?: React.ReactNode; 
+  inline?: boolean; 
+  node?: any; 
 }
 
-export default function VSCodeCodeBlock({ filename: initialFilename, language: initialLanguage, code: initialCode, ...props }: VSCodeCodeBlockProps) {
+export default function VSCodeCodeBlock({ 
+  filename: initialFilename, 
+  language: initialLanguage = "plaintext", 
+  code: initialCode = "",
+  // Destructure other props to prevent them from being passed down to div if not needed
+  className: propClassName, 
+  children: propChildren, 
+  inline: propInline, 
+  node: propNode, 
+  ...restProps 
+}: VSCodeCodeBlockProps) {
   const [isCopied, setIsCopied] = useState(false);
   const { toast } = useToast();
 
-  // Extract code from children if initialCode is not directly provided
-  // react-markdown passes code as children
-  const code = initialCode || (Array.isArray(props.children) ? String(props.children[0]) : String(props.children)).replace(/\n$/, '');
-  
-  // Extract language from className if not directly provided
-  // react-markdown passes language as className="language-xyz"
-  let language = initialLanguage || "plaintext";
-  if (props.className) {
-    const match = /language-(\w+)/.exec(props.className || '');
-    if (match) {
-      language = match[1];
-    }
-  }
-  
-  const filename = initialFilename || "file.txt";
-
+  const codeToDisplay = initialCode;
+  const langToDisplay = initialLanguage === '' ? 'plaintext' : initialLanguage; // Ensure langToDisplay has a default
 
   useEffect(() => {
     try {
-      const elements = document.querySelectorAll('pre code');
-      if (elements.length > 0) {
-        // More targeted highlighting can be done if needed
-        // For now, highlightAll is used as in the original component
-        elements.forEach(el => hljs.highlightElement(el as HTMLElement));
-      }
+      // More targeted highlighting using a ref could be an option for complex scenarios,
+      // but querySelectorAll is fine for typical usage.
+      document.querySelectorAll('pre code.language-' + langToDisplay).forEach(el => {
+        // Check if already highlighted to prevent re-highlighting by hljs.highlightAll or similar
+        if (!el.classList.contains('hljs') && !(el as HTMLElement).dataset.highlighted) {
+          hljs.highlightElement(el as HTMLElement);
+          (el as HTMLElement).dataset.highlighted = 'true';
+        }
+      });
     } catch (e) {
       console.error("highlight.js error:", e);
     }
-  }, [code, language]); // Re-run when code or language changes
+  }, [codeToDisplay, langToDisplay]); // Re-run when code or language changes
 
   const handleCopy = async () => {
-    if (!code) return;
+    if (!codeToDisplay) return;
     try {
-      await navigator.clipboard.writeText(code);
+      await navigator.clipboard.writeText(codeToDisplay);
       setIsCopied(true);
-      // Removed success toast to adhere to PRD guidelines
-      // toast({ title: "Copiado!", description: "O código foi copiado para a área de transferência." });
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
       console.error("Failed to copy code: ", err);
@@ -66,10 +64,10 @@ export default function VSCodeCodeBlock({ filename: initialFilename, language: i
     }
   };
 
-  const displayName = filename && filename !== "file.txt" ? filename : language;
+  const displayName = initialFilename || langToDisplay;
 
   return (
-    <div className="bg-[#1e1e1e] rounded-xl overflow-hidden shadow-lg border border-gray-700/50 font-mono text-sm my-4 relative group">
+    <div className="bg-[#1e1e1e] rounded-xl overflow-hidden shadow-lg border border-gray-700/50 font-mono text-sm my-4 relative group" {...restProps}>
       <div className="flex items-center justify-between bg-[#2d2d2d] text-gray-300 px-4 py-2 border-b border-gray-700/50">
         <div className="flex items-center space-x-2">
           <span className="h-3 w-3 rounded-full bg-red-500 block"></span>
@@ -88,10 +86,10 @@ export default function VSCodeCodeBlock({ filename: initialFilename, language: i
         </Button>
       </div>
 
-      <div className="p-4 overflow-x-auto text-white hljs">
-        <pre key={`${language}-${code.substring(0,50)}`} className="!p-0 !bg-transparent !whitespace-pre-wrap !break-words">
-          <code className={`language-${language}`}>
-            {code}
+      <div className="p-4 overflow-x-auto text-white">
+        <pre className="!p-0 !bg-transparent !whitespace-pre-wrap !break-words">
+          <code className={`language-${langToDisplay}`}>
+            {codeToDisplay}
           </code>
         </pre>
       </div>
