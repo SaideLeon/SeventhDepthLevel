@@ -188,7 +188,7 @@ export default function ChatInterface() {
 
     let contextContent: string | undefined = undefined;
     let imageInfo: string | undefined = undefined;
-    let flowToUse: 'simple' | 'academic' = 'academic';
+    let flowToUse: 'simple' | 'academic' = 'academic'; // Default to academic
     let performSearchDecisionMade = false;
     let shouldPerformSearchBasedOnDecision = false;
 
@@ -196,7 +196,8 @@ export default function ChatInterface() {
       updateThinkingMessage(assistantMessageId, { currentProcessingStepMessage: "Determinando o tipo de resposta..." });
 
       let detectedQueryTypeResult: DetectQueryTypeOutput | null = null;
-      if (userMessageContent || userImageDataUri) { // Only detect query type if there is some input
+      // Only detect query type if there is some input, or search is enabled (to decide if general conversation)
+      if (userMessageContent || userImageDataUri || isSearchEnabled) {
           const queryTypeResponse = await fetch('/api/detect-query-type', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -210,12 +211,14 @@ export default function ChatInterface() {
       }
 
 
+      // Determine which flow to use
       if (userImageDataUri || !isSearchEnabled || detectedQueryTypeResult?.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult?.queryType === 'IMAGE_ANALYSIS' || detectedQueryTypeResult?.queryType === 'GENERAL_CONVERSATION') {
         flowToUse = 'simple';
-      } else {
+      } else { // Implicitly ACADEMIC_RESEARCH or similar needing potential search
         flowToUse = 'academic';
       }
 
+      // If academic flow is chosen and search is enabled and there's text content, decide if search is needed
       if (flowToUse === 'academic' && isSearchEnabled && userMessageContent) {
         updateThinkingMessage(assistantMessageId, { currentProcessingStepMessage: "Analisando a necessidade de pesquisa..." });
 
@@ -242,6 +245,7 @@ export default function ChatInterface() {
         performSearchDecisionMade = true;
       }
 
+      // Perform search if academic flow, search enabled, text content, and decision is to search
       if (flowToUse === 'academic' && isSearchEnabled && userMessageContent && performSearchDecisionMade && shouldPerformSearchBasedOnDecision) {
           updateThinkingMessage(assistantMessageId, { currentProcessingStepMessage: "Detectando o tópico para pesquisa..." });
           const topicResponse = await fetch('/api/detect-topic', {
@@ -306,7 +310,7 @@ export default function ChatInterface() {
       } else if (flowToUse === 'academic' && isSearchEnabled && userMessageContent && performSearchDecisionMade && !shouldPerformSearchBasedOnDecision) {
         updateThinkingMessage(assistantMessageId, { currentProcessingStepMessage: "Pesquisa não necessária. Preparando resposta..." });
         await new Promise(resolve => setTimeout(resolve, 1000));
-      } else if (flowToUse === 'simple' && (!isSearchEnabled || (detectedQueryTypeResult?.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult?.queryType === 'GENERAL_CONVERSATION'))) {
+      } else if (flowToUse === 'simple' && ( !isSearchEnabled || (detectedQueryTypeResult?.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult?.queryType === 'GENERAL_CONVERSATION') ) ) {
          updateThinkingMessage(assistantMessageId, { currentProcessingStepMessage: "Preparando uma resposta direta..." });
          await new Promise(resolve => setTimeout(resolve, 1000));
       } else if (flowToUse === 'simple' && userImageDataUri) {
@@ -336,7 +340,7 @@ export default function ChatInterface() {
         };
         const simpleResult: GenerateSimpleResponseOutput = await generateSimpleResponse(simpleInput);
         aiResultText = simpleResult.response;
-      } else {
+      } else { // flowToUse === 'academic'
         const academicInput: GenerateAcademicResponseInput = {
           prompt: userMessage.content,
           userImageInputDataUri: userMessage.imageDataUri,
@@ -400,7 +404,7 @@ export default function ChatInterface() {
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
-      <header className="p-3 border-b flex justify-between items-center shadow-sm sticky top-0 bg-background z-10">
+      <header className="p-2 border-b flex justify-between items-center shadow-sm sticky top-0 bg-background z-10">
         <h1 className="text-2xl font-headline font-semibold text-primary">Cabulador</h1>
         <div className="flex items-center gap-2">
           <ThemeToggleButton />
