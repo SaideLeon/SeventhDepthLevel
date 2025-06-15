@@ -50,7 +50,7 @@ interface ChatSession {
   messages: Message[];
   createdAt: number;
   lastUpdatedAt: number;
-  hasAiGeneratedTitle?: boolean; // New flag
+  hasAiGeneratedTitle?: boolean;
 }
 
 const TYPING_SPEED_STORAGE_KEY = "cabulador_typing_speed";
@@ -78,7 +78,6 @@ export default function ChatInterface() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  // Load settings from localStorage
   useEffect(() => {
     const storedSpeed = localStorage.getItem(TYPING_SPEED_STORAGE_KEY);
     if (storedSpeed) setTypingSpeed(Number(storedSpeed)); else setTypingSpeed(1);
@@ -90,7 +89,6 @@ export default function ChatInterface() {
     if (storedSearchEnabled) setIsSearchEnabled(storedSearchEnabled === 'true'); else setIsSearchEnabled(true);
   }, []);
 
-  // Save settings to localStorage
   useEffect(() => { localStorage.setItem(TYPING_SPEED_STORAGE_KEY, typingSpeed.toString()); }, [typingSpeed]);
   useEffect(() => { localStorage.setItem(AI_PERSONA_STORAGE_KEY, aiPersona); }, [aiPersona]);
   useEffect(() => { localStorage.setItem(AI_RULES_STORAGE_KEY, aiRules); }, [aiRules]);
@@ -104,7 +102,7 @@ export default function ChatInterface() {
       messages: [],
       createdAt: Date.now(),
       lastUpdatedAt: Date.now(),
-      hasAiGeneratedTitle: false, // Initialize new flag
+      hasAiGeneratedTitle: false,
     };
     setSessions(prev => [newSession, ...prev.sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt)]);
     setActiveSessionId(newSessionId);
@@ -113,7 +111,6 @@ export default function ChatInterface() {
     return newSessionId;
   }, []);
 
-  // Load sessions from localStorage
    useEffect(() => {
     const storedSessions = localStorage.getItem(SESSIONS_STORAGE_KEY);
     const storedActiveId = localStorage.getItem(ACTIVE_SESSION_ID_STORAGE_KEY);
@@ -122,7 +119,6 @@ export default function ChatInterface() {
     if (storedSessions) {
       try {
         loadedSessions = JSON.parse(storedSessions);
-        // Ensure all sessions have the hasAiGeneratedTitle flag
         loadedSessions = loadedSessions.map(s => ({...s, hasAiGeneratedTitle: s.hasAiGeneratedTitle || false}));
       } catch (e) {
         console.error("Failed to parse sessions from localStorage", e);
@@ -135,16 +131,15 @@ export default function ChatInterface() {
     if (storedActiveId && loadedSessions.some(s => s.id === storedActiveId)) {
       setActiveSessionId(storedActiveId);
     } else if (loadedSessions.length > 0) {
-      setActiveSessionId(loadedSessions[0].id); // Default to the most recently updated
+      setActiveSessionId(loadedSessions[0].id);
     } else {
       handleStartNewChat();
     }
   }, [handleStartNewChat]);
 
 
-  // Save sessions and activeSessionId to localStorage
   useEffect(() => {
-    if (sessions.length > 0) { // Only save if there are sessions to prevent wiping on initial load issues
+    if (sessions.length > 0) {
         localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
     }
   }, [sessions]);
@@ -228,13 +223,12 @@ export default function ChatInterface() {
       ).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt)
     );
 
-    // AI Title Generation Logic
     const currentSession = sessions.find(s => s.id === sessionId);
     if (currentSession && !currentSession.hasAiGeneratedTitle && userFirstMessageForTitle) {
         const assistantMessages = currentSession.messages.filter(m => m.role === 'assistant' && !m.isThinkingPlaceholder && m.id !== thinkingMessageId);
         const firstAIMessage = assistantMessages.length > 0 ? assistantMessages[0] : {id: thinkingMessageId, role: 'assistant', content: finalMessageContent} as Message;
 
-        if (firstAIMessage && firstAIMessage.content) { // Ensure AI has responded with content
+        if (firstAIMessage && firstAIMessage.content) {
             try {
                 const titleResponse = await fetch('/api/generate-session-title', {
                     method: 'POST',
@@ -244,8 +238,10 @@ export default function ChatInterface() {
                         aiFirstResponseContent: firstAIMessage.content,
                     }),
                 });
-                if (titleResponse.ok) {
-                    const titleResult: GenerateSessionTitleOutput = await titleResponse.json();
+
+                const contentType = titleResponse.headers.get("content-type");
+                if (titleResponse.ok && contentType && contentType.includes("application/json")) {
+                    const titleResult: GenerateSessionTitleOutput & { error?: string; details?: string } = await titleResponse.json();
                     if (titleResult.generatedTitle) {
                         setSessions(prev =>
                             prev.map(s =>
@@ -254,12 +250,20 @@ export default function ChatInterface() {
                                     : s
                             ).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt)
                         );
+                    } else if (titleResult.error) {
+                        console.warn("API returned error for session title generation:", titleResult.error, titleResult.details);
                     }
                 } else {
-                    console.warn("Failed to generate AI session title:", await titleResponse.text());
+                    const errorText = await titleResponse.text();
+                    console.warn(
+                        "Failed to generate AI session title. Status:",
+                        titleResponse.status,
+                        "Content-Type:", contentType,
+                        "Response body:", errorText
+                    );
                 }
             } catch (error) {
-                console.error("Error calling generate session title API:", error);
+                console.error("Error calling generate session title API or parsing its response:", error);
             }
         }
     }
@@ -268,7 +272,7 @@ export default function ChatInterface() {
   const handleImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      if (file.size > 5 * 1024 * 1024) {
         toast({ title: "Imagem Muito Grande", description: "Por favor, selecione uma imagem menor que 5MB.", variant: "destructive" });
         return;
       }
@@ -337,7 +341,6 @@ export default function ChatInterface() {
     
     const sessionForTitleUpdate = sessions.find(s => s.id === currentSessionId);
     if (sessionForTitleUpdate && !sessionForTitleUpdate.hasAiGeneratedTitle && sessionForTitleUpdate.title.startsWith("Nova Conversa")) {
-        // This is a temporary title. AI title generation will happen after AI's first response.
         if (userMessageContent) {
             const tempTitle = userMessageContent.substring(0, 30) + (userMessageContent.length > 30 ? "..." : "");
             setSessions(prev => prev.map(s => s.id === currentSessionId ? {...s, title: tempTitle, lastUpdatedAt: Date.now()} : s).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt));
@@ -616,3 +619,5 @@ export default function ChatInterface() {
     </SidebarProvider>
   );
 }
+
+    
