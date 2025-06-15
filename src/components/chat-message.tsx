@@ -23,6 +23,7 @@ interface Message {
   isThinkingPlaceholder?: boolean;
   startTime?: number;
   currentProcessingStepMessage?: string;
+  applyTypewriter?: boolean; // Added from chat-interface
 }
 
 interface ChatMessageProps {
@@ -59,13 +60,19 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
   }, [message.isThinkingPlaceholder, message.startTime]);
 
   useEffect(() => {
-    if (message.role === "assistant" && !message.isThinkingPlaceholder) {
-      setIsTypingComplete(false);
+    // Determine if the content should be considered "complete" (i.e., skip typewriter)
+    let shouldBeComplete = true; // Default to complete (no typing)
+
+    if (message.role === "assistant" && !message.isThinkingPlaceholder && message.applyTypewriter === true) {
+      // This is a new AI message that needs typing
+      shouldBeComplete = false;
     }
-    if (isUser || message.isThinkingPlaceholder) {
-        setIsTypingComplete(true);
-    }
-  }, [message.content, message.role, isUser, message.isThinkingPlaceholder]);
+    // User messages, placeholders, and historical AI messages (applyTypewriter is not true or undefined)
+    // are considered "complete" from the start.
+    
+    setIsTypingComplete(shouldBeComplete);
+
+  }, [message.role, message.isThinkingPlaceholder, message.applyTypewriter, message.id, message.content]);
 
 
   const handleTypingComplete = () => {
@@ -122,7 +129,6 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
                 return <VSCodeCodeBlock language={language} code={finalCodeString} filename={filename} />;
               }
             }
-            // Fallback for unexpected structure or simple pre tags without a nested code
             return <pre {...props} className="bg-muted p-2 rounded-md overflow-x-auto my-2 text-sm">{children}</pre>; 
           },
           code({ node, inline, className, children, ...props }) {
@@ -133,9 +139,6 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
                 </code>
               );
             }
-            // For non-inline code that's NOT inside a <pre> (should be rare with remarkGfm for fenced blocks)
-            // This case is typically handled by the `pre` component above for fenced code blocks.
-            // If it reaches here, it might be a standalone <code> block not wrapped by <pre>.
             const match = /language-(\w+)/.exec(className || '');
             const lang = match ? match[1] : 'plaintext';
             const codeString = Array.isArray(children) ? children.join('') : String(children);

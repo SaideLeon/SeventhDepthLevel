@@ -42,6 +42,7 @@ interface Message {
   isThinkingPlaceholder?: boolean;
   startTime?: number;
   currentProcessingStepMessage?: string;
+  applyTypewriter?: boolean; // True if this message should use the typewriter effect
 }
 
 interface ChatSession {
@@ -119,8 +120,12 @@ export default function ChatInterface() {
     if (storedSessions) {
       try {
         loadedSessions = JSON.parse(storedSessions);
-        // Ensure hasAiGeneratedTitle exists, defaulting to false if not
-        loadedSessions = loadedSessions.map(s => ({...s, hasAiGeneratedTitle: s.hasAiGeneratedTitle || false}));
+        // Ensure hasAiGeneratedTitle and applyTypewriter defaults
+        loadedSessions = loadedSessions.map(s => ({
+            ...s, 
+            hasAiGeneratedTitle: s.hasAiGeneratedTitle || false,
+            messages: s.messages.map(m => ({...m, applyTypewriter: m.applyTypewriter || false})) // Historical messages don't typewrite
+        }));
       } catch (e) {
         console.error("Failed to parse sessions from localStorage", e);
         loadedSessions = []; // Reset to empty if parsing fails
@@ -221,10 +226,10 @@ export default function ChatInterface() {
         if (session.id === sessionId) {
           const updatedMessages = session.messages.map(msg =>
             msg.id === thinkingMessageId
-              ? { ...msg, content: finalMessageContent, isThinkingPlaceholder: false, startTime: undefined, currentProcessingStepMessage: undefined }
+              ? { ...msg, content: finalMessageContent, isThinkingPlaceholder: false, startTime: undefined, currentProcessingStepMessage: undefined, applyTypewriter: true } // Set applyTypewriter to true for new AI message
               : msg
           );
-          sessionAfterMessageUpdate = { // Capture the session *after* message update
+          sessionAfterMessageUpdate = { 
             ...session,
             messages: updatedMessages,
             lastUpdatedAt: Date.now(),
@@ -237,7 +242,6 @@ export default function ChatInterface() {
     });
 
     if (sessionAfterMessageUpdate && !sessionAfterMessageUpdate.hasAiGeneratedTitle && userFirstMessageForTitle) {
-        // Find the AI message that was just finalized. It's the one with thinkingMessageId.
         const firstAIMessageForTitle = sessionAfterMessageUpdate.messages.find(m => m.id === thinkingMessageId && m.role === 'assistant');
 
         if (firstAIMessageForTitle && firstAIMessageForTitle.content) {
@@ -247,7 +251,7 @@ export default function ChatInterface() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         userFirstMessageContent: userFirstMessageForTitle.content,
-                        aiFirstResponseContent: firstAIMessageForTitle.content, // Use the content of the just-finalized AI message
+                        aiFirstResponseContent: firstAIMessageForTitle.content, 
                     }),
                 });
 
@@ -319,12 +323,11 @@ export default function ChatInterface() {
     if ((!userMessageContent && !selectedImageFile) || isLoading) return;
 
     let currentSessionId = activeSessionId;
-    // If no active session or active session not found, start a new one.
     if (!currentSessionId || !sessions.find(s => s.id === currentSessionId)) {
         currentSessionId = handleStartNewChat();
     }
     
-    if (!currentSessionId) { // Should not happen if handleStartNewChat works
+    if (!currentSessionId) { 
         toast({ title: "Erro", description: "Nenhuma sessão ativa. Por favor, inicie uma nova conversa.", variant: "destructive" });
         setIsLoading(false);
         return;
@@ -349,16 +352,16 @@ export default function ChatInterface() {
       role: "user",
       content: userMessageContent,
       imageDataUri: userImageDataUri,
+      applyTypewriter: false, // User messages don't typewrite
     };
     addMessageToSession(currentSessionId, userMessage);
     
-    // Set a temporary title if it's a new chat and doesn't have an AI generated title yet
     const sessionForTitleUpdate = sessions.find(s => s.id === currentSessionId);
     if (sessionForTitleUpdate && !sessionForTitleUpdate.hasAiGeneratedTitle && sessionForTitleUpdate.title.startsWith("Nova Conversa")) {
         if (userMessageContent) {
             const tempTitle = userMessageContent.substring(0, 30) + (userMessageContent.length > 30 ? "..." : "");
             setSessions(prev => prev.map(s => s.id === currentSessionId ? {...s, title: tempTitle, lastUpdatedAt: Date.now()} : s).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt));
-        } else if (userImageDataUri) { // Image only message
+        } else if (userImageDataUri) { 
             setSessions(prev => prev.map(s => s.id === currentSessionId ? {...s, title: "Conversa com Imagem", lastUpdatedAt: Date.now()} : s).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt));
         }
     }
@@ -375,6 +378,7 @@ export default function ChatInterface() {
       isThinkingPlaceholder: true,
       startTime: Date.now(),
       currentProcessingStepMessage: "Analisando sua solicitação...",
+      applyTypewriter: false, // Placeholders don't typewrite content
     };
     addMessageToSession(currentSessionId, thinkingMessage);
 
@@ -386,9 +390,8 @@ export default function ChatInterface() {
     try {
       updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Determinando o tipo de resposta..." });
 
-      // Determine query type (only if content or image, or search is enabled)
       let detectedQueryTypeResult: DetectQueryTypeOutput | null = null;
-      if (userMessageContent || userImageDataUri || isSearchEnabled) { // Only call if there's something to analyze or search might happen
+      if (userMessageContent || userImageDataUri || isSearchEnabled) { 
           const queryTypeResponse = await fetch('/api/detect-query-type', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ currentUserQuery: userMessageContent, userImageProvided: !!userImageDataUri }),
@@ -400,14 +403,12 @@ export default function ChatInterface() {
           detectedQueryTypeResult = await queryTypeResponse.json();
       }
 
-      // Decide flow based on query type or user settings
       if (userImageDataUri || !isSearchEnabled || (detectedQueryTypeResult && (detectedQueryTypeResult.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult.queryType === 'IMAGE_ANALYSIS' || detectedQueryTypeResult.queryType === 'GENERAL_CONVERSATION'))) {
         flowToUse = 'simple';
       } else {
         flowToUse = 'academic';
       }
 
-      // Perform search if academic flow and search is enabled and there's text content
       if (flowToUse === 'academic' && isSearchEnabled && userMessageContent) {
           updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Detectando o tópico para pesquisa..." });
           const topicResponse = await fetch('/api/detect-topic', {
@@ -422,11 +423,11 @@ export default function ChatInterface() {
             updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: `Pesquisando por: "${detectedTopic}"... (até 3 páginas)` });
             const searchApiResponse = await fetch('/api/raspagem', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ termoBusca: detectedTopic, todasPaginas: true }), // Search all (up to 3) pages
+              body: JSON.stringify({ termoBusca: detectedTopic, todasPaginas: true }), 
             });
             if (!searchApiResponse.ok) throw new Error("Falha ao buscar artigos");
             const searchResults: SearchResult[] = await searchApiResponse.json();
-            const articlesToFetch = searchResults.slice(0, 3); // Limit to top 3 articles
+            const articlesToFetch = searchResults.slice(0, 3); 
             let aggregatedContext: string[] = [];
             let aggregatedImageInfo: string[] = [];
 
@@ -441,7 +442,7 @@ export default function ChatInterface() {
                 if (!contentApiResponse.ok) { console.warn(`Falha ao buscar conteúdo para ${article.url}`); continue; }
                 const pageContent: PageContent = await contentApiResponse.json();
                 if (pageContent.conteudo && !pageContent.erro) {
-                  aggregatedContext.push(`Fonte ${i + 1}: ${pageContent.titulo}\nAutor: ${pageContent.autor || 'N/A'}\nConteúdo:\n${pageContent.conteudo.substring(0, 10000)}...`); // Limit context length per article
+                  aggregatedContext.push(`Fonte ${i + 1}: ${pageContent.titulo}\nAutor: ${pageContent.autor || 'N/A'}\nConteúdo:\n${pageContent.conteudo.substring(0, 10000)}...`); 
                   if (pageContent.imagens && pageContent.imagens.length > 0) aggregatedImageInfo.push(pageContent.imagens.map(img => `${img.legenda || pageContent.titulo || 'Imagem'} (${img.src})`).join('; '));
                 }
               }
@@ -451,18 +452,17 @@ export default function ChatInterface() {
                 searchPerformedAndFoundContext = true;
               } else {
                  updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: `Nenhum conteúdo de artigo encontrado para "${detectedTopic}". Prosseguindo com conhecimento geral...` });
-                 await new Promise(resolve => setTimeout(resolve, 1500)); // Brief pause for user to read
+                 await new Promise(resolve => setTimeout(resolve, 1500)); 
               }
             } else {
                updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: `Nenhum artigo relevante encontrado para "${detectedTopic}". Prosseguindo com conhecimento geral...` });
-               await new Promise(resolve => setTimeout(resolve, 1500)); // Brief pause
+               await new Promise(resolve => setTimeout(resolve, 1500)); 
             }
           }
-      } else if (flowToUse === 'simple' && (!userMessageContent && userImageDataUri)) { // Image-only simple query
+      } else if (flowToUse === 'simple' && (!userMessageContent && userImageDataUri)) { 
           updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Analisando a imagem..." });
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate analysis time
+          await new Promise(resolve => setTimeout(resolve, 1000)); 
       } else if (flowToUse === 'simple' && ( !isSearchEnabled || (detectedQueryTypeResult && (detectedQueryTypeResult.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult.queryType === 'GENERAL_CONVERSATION' || detectedQueryTypeResult.queryType === 'IMAGE_ANALYSIS')) ) ) {
-         // Simple flow due to search disabled or specific query types not needing academic search
          updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Preparando uma resposta direta..." });
          await new Promise(resolve => setTimeout(resolve, 1000));
       }
@@ -472,7 +472,7 @@ export default function ChatInterface() {
       if (flowToUse === 'academic') {
         if (searchPerformedAndFoundContext) {
             finalStepMessage = "Gerando resposta com o novo contexto...";
-        } else if (isSearchEnabled && userMessageContent) { // Attempted search but found nothing or no topic
+        } else if (isSearchEnabled && userMessageContent) { 
             finalStepMessage = "Gerando resposta com base no conhecimento geral...";
         }
       } else if (flowToUse === 'simple' && userImageDataUri && !userMessageContent) {
@@ -481,12 +481,10 @@ export default function ChatInterface() {
       updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: finalStepMessage });
 
 
-      // Prepare conversation history for AI
-      // Get the *current* state of messages for this session *before* sending to AI
       const activeSessionMessagesForAI = sessions.find(s => s.id === currentSessionId)?.messages || [];
       const conversationHistoryForAI = activeSessionMessagesForAI
-        .filter(msg => !msg.isThinkingPlaceholder && msg.id !== assistantMessageId && msg.id !== userMessage.id) // Exclude current user & thinking msg
-        .slice(-6) // Take last 6 messages (3 user, 3 assistant turns)
+        .filter(msg => !msg.isThinkingPlaceholder && msg.id !== assistantMessageId && msg.id !== userMessage.id) 
+        .slice(-6) 
         .map(msg => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
 
       let aiResultText: string;
@@ -498,7 +496,7 @@ export default function ChatInterface() {
         };
         const simpleResult: GenerateSimpleResponseOutput = await generateSimpleResponse(simpleInput);
         aiResultText = simpleResult.response;
-      } else { // Academic flow
+      } else { 
         const academicInput: GenerateAcademicResponseInput = {
           prompt: userMessage.content, userImageInputDataUri: userMessage.imageDataUri,
           persona: aiPersona || undefined, rules: aiRules || undefined,
@@ -522,7 +520,6 @@ export default function ChatInterface() {
         else if (error.message.includes("fetch article content")) errorDescription = "Falha ao buscar conteúdo do artigo.";
       }
       toast({ title: "Erro", description: errorDescription, variant: "destructive" });
-      // Replace thinking message with an error message in the chat
       await replaceThinkingWithMessageInSession(currentSessionId, assistantMessageId, "Desculpe, não consegui processar sua solicitação.");
     } finally {
       setIsLoading(false);
@@ -640,5 +637,4 @@ export default function ChatInterface() {
     </SidebarProvider>
   );
 }
-
     
