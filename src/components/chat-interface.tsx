@@ -20,7 +20,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarInset,
-  SidebarTrigger, // Added for mobile
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 
 
@@ -267,7 +267,7 @@ export default function ChatInterface() {
         currentSessionId = handleStartNewChat();
     }
     
-    if (!currentSessionId) { // Should not happen if handleStartNewChat works
+    if (!currentSessionId) { 
         toast({ title: "Erro", description: "Nenhuma sessão ativa. Por favor, inicie uma nova conversa.", variant: "destructive" });
         setIsLoading(false);
         return;
@@ -295,7 +295,6 @@ export default function ChatInterface() {
     };
     addMessageToSession(currentSessionId, userMessage);
     
-    // Update session title if it's the default title and it's the first user message
     const currentSessionForTitle = sessions.find(s => s.id === currentSessionId);
     if (currentSessionForTitle && currentSessionForTitle.title.startsWith("Nova Conversa") && currentSessionForTitle.messages.filter(m => m.role === 'user').length === 1) {
         let newTitle = "Conversa";
@@ -324,7 +323,7 @@ export default function ChatInterface() {
 
     let contextContent: string | undefined = undefined;
     let imageInfo: string | undefined = undefined;
-    let flowToUse: 'simple' | 'academic' = 'academic'; // Default to academic
+    let flowToUse: 'simple' | 'academic' = 'academic'; 
     let performSearchDecisionMade = false;
     let shouldPerformSearchBasedOnDecision = false;
 
@@ -332,8 +331,7 @@ export default function ChatInterface() {
       updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Determinando o tipo de resposta..." });
 
       let detectedQueryTypeResult: DetectQueryTypeOutput | null = null;
-      // Only call detectQueryType if there's text or search is generally enabled for text-based queries
-      if (userMessageContent || userImageDataUri || isSearchEnabled) { // Broad condition to ensure it runs if relevant
+      if (userMessageContent || userImageDataUri || isSearchEnabled) { 
           const queryTypeResponse = await fetch('/api/detect-query-type', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ currentUserQuery: userMessageContent, userImageProvided: !!userImageDataUri }),
@@ -345,14 +343,12 @@ export default function ChatInterface() {
           detectedQueryTypeResult = await queryTypeResponse.json();
       }
 
-      // Determine flow based on query type, image presence, or search setting
       if (userImageDataUri || !isSearchEnabled || (detectedQueryTypeResult && (detectedQueryTypeResult.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult.queryType === 'IMAGE_ANALYSIS' || detectedQueryTypeResult.queryType === 'GENERAL_CONVERSATION'))) {
         flowToUse = 'simple';
       } else {
         flowToUse = 'academic';
       }
 
-      // Logic for search decision and execution (only if academic flow and search is enabled and there's text)
       if (flowToUse === 'academic' && isSearchEnabled && userMessageContent) {
         updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Analisando a necessidade de pesquisa..." });
         
@@ -371,11 +367,10 @@ export default function ChatInterface() {
         }
         const decisionResult: DecideSearchNecessityOutput = await decisionResponse.json();
         shouldPerformSearchBasedOnDecision = decisionResult.decision === "SEARCH_NEEDED";
-        performSearchDecisionMade = true; // Mark that a decision was made
+        performSearchDecisionMade = true; 
       }
 
 
-      // Perform search if academic flow, enabled, text query, and decision was to search
       if (flowToUse === 'academic' && isSearchEnabled && userMessageContent && performSearchDecisionMade && shouldPerformSearchBasedOnDecision) {
           updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Detectando o tópico para pesquisa..." });
           const topicResponse = await fetch('/api/detect-topic', {
@@ -418,35 +413,30 @@ export default function ChatInterface() {
                 if (aggregatedImageInfo.length > 0) imageInfo = `Imagens encontradas que podem ser relevantes: ${aggregatedImageInfo.join('; ')}`;
               } else {
                  updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: `Nenhum conteúdo de artigo encontrado para "${detectedTopic}". Prosseguindo com conhecimento geral...` });
-                 await new Promise(resolve => setTimeout(resolve, 1500)); // Brief pause
+                 await new Promise(resolve => setTimeout(resolve, 1500)); 
               }
             } else {
                updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: `Nenhum artigo relevante encontrado para "${detectedTopic}". Prosseguindo com conhecimento geral...` });
-               await new Promise(resolve => setTimeout(resolve, 1500)); // Brief pause
+               await new Promise(resolve => setTimeout(resolve, 1500)); 
             }
           }
       } else if (flowToUse === 'academic' && isSearchEnabled && userMessageContent && performSearchDecisionMade && !shouldPerformSearchBasedOnDecision) {
-        // Search was decided against
         updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Pesquisa não necessária. Preparando resposta..." });
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Brief pause
-      } else if (flowToUse === 'simple' && ( !isSearchEnabled || (detectedQueryTypeResult && (detectedQueryTypeResult.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult.queryType === 'GENERAL_CONVERSATION')) ) ) {
-         // Direct simple response (no search path)
-         updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Preparando uma resposta direta..." });
-         await new Promise(resolve => setTimeout(resolve, 1000)); // Brief pause
-      } else if (flowToUse === 'simple' && userImageDataUri) { // Image analysis via simple flow
-         updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Analisando a imagem..." });
-         await new Promise(resolve => setTimeout(resolve, 1000)); // Brief pause
+        await new Promise(resolve => setTimeout(resolve, 1000)); 
+      } else if ( (flowToUse === 'simple' && !userMessageContent && userImageDataUri) || (flowToUse === 'simple' && ( !isSearchEnabled || (detectedQueryTypeResult && (detectedQueryTypeResult.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult.queryType === 'GENERAL_CONVERSATION' || detectedQueryTypeResult.queryType === 'IMAGE_ANALYSIS')) ) ) ) {
+         const thinkingMessage = userImageDataUri && !userMessageContent ? "Analisando a imagem..." : "Preparando uma resposta direta...";
+         updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: thinkingMessage });
+         await new Promise(resolve => setTimeout(resolve, 1000)); 
       }
 
 
       const finalStepMessage = contextContent ? "Gerando resposta com o novo contexto..." : "Gerando resposta...";
       updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: finalStepMessage });
 
-      // Prepare conversation history for AI
       const activeSessionMessagesForAI = sessions.find(s => s.id === currentSessionId)?.messages || [];
       const conversationHistoryForAI = activeSessionMessagesForAI
-        .filter(msg => !msg.isThinkingPlaceholder && msg.id !== assistantMessageId && msg.id !== userMessage.id) // Exclude current thinking and user message
-        .slice(-6) // Take last 6 relevant messages
+        .filter(msg => !msg.isThinkingPlaceholder && msg.id !== assistantMessageId && msg.id !== userMessage.id) 
+        .slice(-6) 
         .map(msg => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
 
       let aiResultText: string;
@@ -458,7 +448,7 @@ export default function ChatInterface() {
         };
         const simpleResult: GenerateSimpleResponseOutput = await generateSimpleResponse(simpleInput);
         aiResultText = simpleResult.response;
-      } else { // 'academic' flow
+      } else { 
         const academicInput: GenerateAcademicResponseInput = {
           prompt: userMessage.content, userImageInputDataUri: userMessage.imageDataUri,
           persona: aiPersona || undefined, rules: aiRules || undefined,
@@ -524,7 +514,7 @@ export default function ChatInterface() {
                     tooltip={{children: session.title, side: "right", align:"center"}}
                   >
                     <MessageSquareText className="h-4 w-4 text-muted-foreground group-data-[collapsible=icon]:text-inherit" />
-                    <span className="truncate group-data-[collapsible=icon]:hidden">{session.title}</span>
+                    <span className="truncate">{session.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -537,7 +527,7 @@ export default function ChatInterface() {
         <div className="flex flex-col h-screen bg-background text-foreground">
           <header className="p-2 border-b flex justify-between items-center shadow-sm sticky top-0 bg-background z-10">
             <div className="flex items-center gap-1">
-                 <SidebarTrigger className="md:hidden" /> {/* Mobile trigger */}
+                 <SidebarTrigger className="md:hidden" /> 
                  <h1 className="text-xl md:text-2xl font-headline font-semibold text-primary">Cabulador</h1>
             </div>
             <div className="flex items-center gap-2">
