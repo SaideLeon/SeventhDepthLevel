@@ -27,7 +27,6 @@ import {
 import { generateAcademicResponse, type GenerateAcademicResponseOutput, type GenerateAcademicResponseInput } from "@/ai/flows/generate-academic-response-flow";
 import { generateSimpleResponse, type GenerateSimpleResponseOutput, type GenerateSimpleResponseInput } from "@/ai/flows/generate-simple-response-flow";
 import type { DetectTopicFromTextOutput } from "@/ai/flows/detect-topic-flow";
-import type { DecideSearchNecessityOutput } from "@/ai/flows/decide-search-flow";
 import type { DetectQueryTypeOutput } from "@/ai/flows/detect-query-type-flow";
 
 import type { SearchResult, PageContent } from "@/utils/raspagem";
@@ -323,9 +322,8 @@ export default function ChatInterface() {
 
     let contextContent: string | undefined = undefined;
     let imageInfo: string | undefined = undefined;
-    let flowToUse: 'simple' | 'academic' = 'academic'; 
-    let performSearchDecisionMade = false;
-    let shouldPerformSearchBasedOnDecision = false;
+    let flowToUse: 'simple' | 'academic' = 'academic';
+    let searchPerformedAndFoundContext = false;
 
     try {
       updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Determinando o tipo de resposta..." });
@@ -350,28 +348,6 @@ export default function ChatInterface() {
       }
 
       if (flowToUse === 'academic' && isSearchEnabled && userMessageContent) {
-        updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Analisando a necessidade de pesquisa..." });
-        
-        const activeSessionMessages = sessions.find(s => s.id === currentSessionId)?.messages || [];
-        const lastTwoAIMessages = activeSessionMessages.filter(msg => msg.role === 'assistant' && !msg.isThinkingPlaceholder && msg.id !== assistantMessageId).slice(-2);
-        const previousAiResponse1 = lastTwoAIMessages.length > 0 ? lastTwoAIMessages[lastTwoAIMessages.length - 1].content : undefined;
-        const previousAiResponse2 = lastTwoAIMessages.length > 1 ? lastTwoAIMessages[0].content : undefined;
-
-        const decisionResponse = await fetch('/api/decide-search', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ currentUserQuery: userMessageContent, previousAiResponse1, previousAiResponse2 }),
-        });
-        if (!decisionResponse.ok) {
-            const errorData = await decisionResponse.json();
-            throw new Error(`Falha ao decidir a necessidade de pesquisa: ${errorData.error || decisionResponse.statusText}`);
-        }
-        const decisionResult: DecideSearchNecessityOutput = await decisionResponse.json();
-        shouldPerformSearchBasedOnDecision = decisionResult.decision === "SEARCH_NEEDED";
-        performSearchDecisionMade = true; 
-      }
-
-
-      if (flowToUse === 'academic' && isSearchEnabled && userMessageContent && performSearchDecisionMade && shouldPerformSearchBasedOnDecision) {
           updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Detectando o tópico para pesquisa..." });
           const topicResponse = await fetch('/api/detect-topic', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -411,6 +387,7 @@ export default function ChatInterface() {
               if (aggregatedContext.length > 0) {
                 contextContent = aggregatedContext.join("\n\n---\n\n");
                 if (aggregatedImageInfo.length > 0) imageInfo = `Imagens encontradas que podem ser relevantes: ${aggregatedImageInfo.join('; ')}`;
+                searchPerformedAndFoundContext = true;
               } else {
                  updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: `Nenhum conteúdo de artigo encontrado para "${detectedTopic}". Prosseguindo com conhecimento geral...` });
                  await new Promise(resolve => setTimeout(resolve, 1500)); 
@@ -420,18 +397,27 @@ export default function ChatInterface() {
                await new Promise(resolve => setTimeout(resolve, 1500)); 
             }
           }
-      } else if (flowToUse === 'academic' && isSearchEnabled && userMessageContent && performSearchDecisionMade && !shouldPerformSearchBasedOnDecision) {
-        updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Pesquisa não necessária. Preparando resposta..." });
-        await new Promise(resolve => setTimeout(resolve, 1000)); 
-      } else if ( (flowToUse === 'simple' && !userMessageContent && userImageDataUri) || (flowToUse === 'simple' && ( !isSearchEnabled || (detectedQueryTypeResult && (detectedQueryTypeResult.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult.queryType === 'GENERAL_CONVERSATION' || detectedQueryTypeResult.queryType === 'IMAGE_ANALYSIS')) ) ) ) {
-         const thinkingMessage = userImageDataUri && !userMessageContent ? "Analisando a imagem..." : "Preparando uma resposta direta...";
-         updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: thinkingMessage });
-         await new Promise(resolve => setTimeout(resolve, 1000)); 
+      } else if (flowToUse === 'simple' && (!userMessageContent && userImageDataUri)) {
+          updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Analisando a imagem..." });
+          await new Promise(resolve => setTimeout(resolve, 1000));
+      } else if (flowToUse === 'simple' && ( !isSearchEnabled || (detectedQueryTypeResult && (detectedQueryTypeResult.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult.queryType === 'GENERAL_CONVERSATION' || detectedQueryTypeResult.queryType === 'IMAGE_ANALYSIS')) ) ) {
+         updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Preparando uma resposta direta..." });
+         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
 
-      const finalStepMessage = contextContent ? "Gerando resposta com o novo contexto..." : "Gerando resposta...";
+      let finalStepMessage = "Gerando resposta...";
+      if (flowToUse === 'academic') {
+        if (searchPerformedAndFoundContext) {
+            finalStepMessage = "Gerando resposta com o novo contexto...";
+        } else if (isSearchEnabled && userMessageContent) { 
+            finalStepMessage = "Gerando resposta com base no conhecimento geral...";
+        }
+      } else if (flowToUse === 'simple' && userImageDataUri && !userMessageContent) {
+        finalStepMessage = "Analisando imagem e gerando resposta...";
+      }
       updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: finalStepMessage });
+
 
       const activeSessionMessagesForAI = sessions.find(s => s.id === currentSessionId)?.messages || [];
       const conversationHistoryForAI = activeSessionMessagesForAI
@@ -466,7 +452,6 @@ export default function ChatInterface() {
       let errorDescription = "Falha ao obter uma resposta da IA. Por favor, tente novamente.";
       if (error instanceof Error) {
         if (error.message.includes("detect query type")) errorDescription = "Falha ao determinar o tipo de consulta.";
-        else if (error.message.includes("decide search necessity")) errorDescription = "Falha ao decidir se a pesquisa era necessária.";
         else if (error.message.includes("detect topic")) errorDescription = "Falha ao detectar o tópico.";
         else if (error.message.includes("search articles")) errorDescription = "Falha ao buscar artigos.";
         else if (error.message.includes("fetch article content")) errorDescription = "Falha ao buscar conteúdo do artigo.";
