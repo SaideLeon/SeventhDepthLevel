@@ -20,9 +20,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-const SIDEBAR_COOKIE_NAME = "sidebar_state"
+const SIDEBAR_COOKIE_NAME = "cabulador_sidebar_state" // Updated to reflect project name
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "16rem" // Default expanded width
+const SIDEBAR_WIDTH = "8.32rem" // Default expanded width - REDUCED FROM 16rem
 const SIDEBAR_WIDTH_MOBILE = "18rem" // Width for mobile sheet
 const SIDEBAR_WIDTH_ICON = "3.5rem" // Width when collapsed to icons (increased for padding)
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
