@@ -22,7 +22,7 @@ import {
 
 const SIDEBAR_COOKIE_NAME = "cabulador_sidebar_state" // Updated to reflect project name
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "10.80rem" // Default expanded width - INCREASED FROM 9.82rem
+const SIDEBAR_WIDTH = "12.42rem" // Default expanded width - INCREASED FROM 10.80rem
 const SIDEBAR_WIDTH_MOBILE = "18rem" // Width for mobile sheet
 const SIDEBAR_WIDTH_ICON = "3.5rem" // Width when collapsed to icons (increased for padding)
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
