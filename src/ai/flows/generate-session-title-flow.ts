@@ -44,16 +44,22 @@ const generateSessionTitlePrompt = ai.definePrompt({
   output: {schema: GenerateSessionTitleOutputSchema},
   prompt: `Based on the user's first message and the AI's first response, generate a very short and concise title (max 5 words) for this conversation.
 The title must be in {{{targetLanguage}}}.
+The title should summarize the *main topic or subject* of the conversation. Avoid simply repeating the user's question if it is one.
+Instead, create a title that describes what the conversation is *about*.
 
 User's first message: "{{userFirstMessageContent}}"
 AI's first response: "{{aiFirstResponseContent}}"
 
 Return only the generated title in the 'generatedTitle' field.
-For example, if user asks "What is photosynthesis?" and AI explains it, a good title would be "Explicação de Fotossíntese" or "Sobre Fotossíntese".
-If user asks "How to make a cake?" and AI provides steps, a good title would be "Receita de Bolo".
-If the user's first message is empty (e.g. only an image was sent) and the AI describes an image of a cat, a good title would be "Análise de Imagem: Gato" or "Gato na Imagem".
-If the conversation is about a code snippet for Python loops, a good title would be "Loop For em Python".
-Be very concise.
+
+Examples:
+- User: "Qual a capital da França?" AI: "A capital da França é Paris." -> Title: "Capital da França"
+- User: "Explique fotossíntese." AI: (explains) -> Title: "Sobre Fotossíntese" or "Explicação Fotossíntese"
+- User: (image of a dog) AI: "Esta é uma imagem de um cachorro." -> Title: "Imagem: Cachorro" or "Análise de Imagem"
+- User: "Preciso de um código em Python para um loop for." AI: (provides code) -> Title: "Loop For Python" or "Código Python"
+- User: "o que é sistema digestivo" AI: "O sistema digestivo é responsável por..." -> Title: "Sistema Digestivo"
+
+Be very concise. Focus on the subject.
 `,
 });
 
