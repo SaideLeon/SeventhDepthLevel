@@ -105,11 +105,8 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
   };
 
   const renderContent = () => {
-    const markdownContent = (
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          pre: ({ node, children, ...props }) => {
+    const markdownComponents = {
+        pre: ({ node, children, ...props }: any) => {
             if (children && Array.isArray(children) && children.length > 0) {
               const codeElement = children[0] as React.ReactElement;
               if (codeElement && codeElement.type === 'code' && codeElement.props) {
@@ -131,7 +128,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
             }
             return <pre {...props} className="bg-muted p-2 rounded-md overflow-x-auto my-2 text-sm">{children}</pre>; 
           },
-          code({ node, inline, className, children, ...props }) {
+          code({ node, inline, className, children, ...props }: any) {
             if (inline) {
               return (
                 <code className="bg-muted text-muted-foreground px-1.5 py-0.5 rounded-sm font-mono text-xs mx-0.5" {...props}>
@@ -144,7 +141,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
             const codeString = Array.isArray(children) ? children.join('') : String(children);
             return <VSCodeCodeBlock language={lang} code={codeString.replace(/\n$/, '')} filename={lang !== 'plaintext' ? `code.${lang}`: undefined}/>;
           },
-           img: ({ node, ...props }) => ( 
+           img: ({ node, ...props }: any) => ( 
             <span className="block my-3 rounded-lg overflow-hidden border shadow-sm">
               <Image
                 src={props.src || "https://placehold.co/600x400.png"}
@@ -157,7 +154,12 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
               />
             </span>
           ),
-        }}
+    };
+
+    const markdownContent = (
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={markdownComponents}
       >
         {message.content}
       </ReactMarkdown>
@@ -229,7 +231,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
             isUser ? "bg-primary text-primary-foreground" : "bg-card relative" 
           )}
         >
-          <CardContent className={cn("p-3 text-sm break-words", {"prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2": (isTypingComplete || isUser) && !message.isThinkingPlaceholder })}>
+          <CardContent className={cn("p-3 text-sm break-words", {"prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2": (isUser || (message.role === 'assistant' && !message.isThinkingPlaceholder)) })}>
             {renderContent()}
           </CardContent>
           {!isUser && isTypingComplete && !message.isThinkingPlaceholder && message.content && (
