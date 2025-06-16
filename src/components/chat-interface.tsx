@@ -32,6 +32,8 @@ import type { GenerateSessionTitleOutput } from "@/ai/flows/generate-session-tit
 import type { SearchResult, PageContent } from "@/utils/raspagem";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { MarkdownWithCode } from "@/components/Markdown/MarkdownWithCode";
+
 
 interface Message {
   id: string;
@@ -127,22 +129,25 @@ export default function ChatInterface() {
       try {
         loadedSessions = JSON.parse(storedSessions);
         loadedSessions = loadedSessions.map(s => ({
-            ...s, 
+            ...s,
             hasAiGeneratedTitle: s.hasAiGeneratedTitle || false,
-            messages: s.messages.map(m => ({...m, applyTypewriter: m.applyTypewriter === undefined ? false : m.applyTypewriter})) 
+            messages: s.messages.map(m => ({
+                ...m,
+                applyTypewriter: false // Force false for ALL messages from localStorage
+            }))
         }));
       } catch (e) {
         console.error("Failed to parse sessions from localStorage", e);
-        loadedSessions = []; 
+        loadedSessions = [];
       }
     }
-    
+
     setSessions(loadedSessions.sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt));
 
     if (storedActiveId && loadedSessions.some(s => s.id === storedActiveId)) {
       setActiveSessionId(storedActiveId);
     } else if (loadedSessions.length > 0) {
-      setActiveSessionId(loadedSessions[0].id); 
+      setActiveSessionId(loadedSessions[0].id);
     } else {
       handleStartNewChat();
     }
@@ -166,7 +171,7 @@ export default function ChatInterface() {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, [sessions, activeSessionId]); 
+  }, [sessions, activeSessionId]);
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
   const currentMessages = activeSession?.messages || [];
@@ -201,7 +206,7 @@ export default function ChatInterface() {
       ).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt)
     );
   };
-  
+
   const updateThinkingMessageInSession = (sessionId: string, thinkingMessageId: string, updates: Partial<Message>) => {
      setSessions(prevSessions =>
       prevSessions.map(session =>
@@ -213,7 +218,7 @@ export default function ChatInterface() {
               ),
             }
           : session
-      ) 
+      )
     );
   };
 
@@ -232,11 +237,11 @@ export default function ChatInterface() {
               ? { ...msg, content: finalMessageContent, isThinkingPlaceholder: false, startTime: undefined, currentProcessingStepMessage: undefined, applyTypewriter: true }
               : msg
           );
-          sessionForTitleUpdate = { 
+          sessionForTitleUpdate = {
             ...session,
             messages: updatedMessages,
             lastUpdatedAt: Date.now(),
-            hasAiGeneratedTitle: session.hasAiGeneratedTitle || false, 
+            hasAiGeneratedTitle: session.hasAiGeneratedTitle || false,
           };
           return sessionForTitleUpdate;
         }
@@ -255,8 +260,8 @@ export default function ChatInterface() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        userFirstMessageContent: userFirstMessageForTitle.content, 
-                        aiFirstResponseContent: firstAIMessageForTitle.content, 
+                        userFirstMessageContent: userFirstMessageForTitle.content,
+                        aiFirstResponseContent: firstAIMessageForTitle.content,
                     }),
                 });
 
@@ -266,7 +271,7 @@ export default function ChatInterface() {
                     if (titleResult.generatedTitle) {
                         setSessions(prev =>
                             prev.map(s =>
-                                s.id === sessionId 
+                                s.id === sessionId
                                     ? { ...s, title: titleResult.generatedTitle, hasAiGeneratedTitle: true, lastUpdatedAt: Date.now() }
                                     : s
                             ).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt)
@@ -275,7 +280,7 @@ export default function ChatInterface() {
                         console.warn("API returned error for session title generation:", titleResult.error, titleResult.details);
                     }
                 } else {
-                    const errorText = await titleResponse.text(); 
+                    const errorText = await titleResponse.text();
                     console.warn(
                         "Failed to generate AI session title. Status:",
                         titleResponse.status,
@@ -293,7 +298,7 @@ export default function ChatInterface() {
   const handleImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { 
+      if (file.size > 5 * 1024 * 1024) {
         toast({ title: "Imagem Muito Grande", description: "Por favor, selecione uma imagem menor que 5MB.", variant: "destructive" });
         return;
       }
@@ -311,7 +316,7 @@ export default function ChatInterface() {
   const clearSelectedImage = () => {
     setSelectedImageFile(null);
     setSelectedImagePreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = ""; 
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const fileToDataUri = (file: File): Promise<string> =>
@@ -332,8 +337,8 @@ export default function ChatInterface() {
     if (!currentSessionId || !sessions.find(s => s.id === currentSessionId)) {
         currentSessionId = handleStartNewChat();
     }
-    
-    if (!currentSessionId) { 
+
+    if (!currentSessionId) {
         toast({ title: "Erro", description: "Nenhuma sessão ativa. Por favor, inicie uma nova conversa.", variant: "destructive" });
         setIsLoading(false);
         return;
@@ -342,7 +347,7 @@ export default function ChatInterface() {
     setIsLoading(true);
     let userImageDataUri: string | undefined = undefined;
 
-    if (selectedImageFile && !promptTextOverride) { 
+    if (selectedImageFile && !promptTextOverride) {
       try {
         userImageDataUri = await fileToDataUri(selectedImageFile);
       } catch (error) {
@@ -358,22 +363,22 @@ export default function ChatInterface() {
       role: "user",
       content: userMessageContent,
       imageDataUri: userImageDataUri,
-      applyTypewriter: false, 
+      applyTypewriter: false,
     };
     addMessageToSession(currentSessionId, userMessage);
-    
+
     const sessionForTempTitle = sessions.find(s => s.id === currentSessionId);
     if (sessionForTempTitle && !sessionForTempTitle.hasAiGeneratedTitle && sessionForTempTitle.title.startsWith("Nova Conversa")) {
         if (userMessageContent) {
             const tempTitle = userMessageContent.substring(0, 30) + (userMessageContent.length > 30 ? "..." : "");
             setSessions(prev => prev.map(s => s.id === currentSessionId ? {...s, title: tempTitle, lastUpdatedAt: Date.now()} : s).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt));
-        } else if (userImageDataUri) { 
+        } else if (userImageDataUri) {
             setSessions(prev => prev.map(s => s.id === currentSessionId ? {...s, title: "Conversa com Imagem", lastUpdatedAt: Date.now()} : s).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt));
         }
     }
 
 
-    if (!promptTextOverride) { 
+    if (!promptTextOverride) {
         setInputValue("");
         clearSelectedImage();
     }
@@ -387,7 +392,7 @@ export default function ChatInterface() {
       isThinkingPlaceholder: true,
       startTime: Date.now(),
       currentProcessingStepMessage: "Analisando sua solicitação...",
-      applyTypewriter: false, 
+      applyTypewriter: false,
     };
     addMessageToSession(currentSessionId, thinkingMessage);
 
@@ -400,13 +405,13 @@ export default function ChatInterface() {
       updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Determinando o tipo de resposta..." });
 
       let detectedQueryTypeResult: DetectQueryTypeOutput | null = null;
-      if (userMessageContent || userImageDataUri || isSearchEnabled) { 
+      if (userMessageContent || userImageDataUri || isSearchEnabled) {
           const queryTypeResponse = await fetch('/api/detect-query-type', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ currentUserQuery: userMessageContent, userImageProvided: !!userImageDataUri }),
           });
           if (!queryTypeResponse.ok) {
-            const errorData = await queryTypeResponse.json(); 
+            const errorData = await queryTypeResponse.json();
             throw new Error(`Falha ao detectar o tipo de consulta: ${errorData.error || queryTypeResponse.statusText}`);
           }
           detectedQueryTypeResult = await queryTypeResponse.json();
@@ -416,7 +421,7 @@ export default function ChatInterface() {
         const refusalMessage = "Olá! Sou uma IA focada em te ajudar com seus estudos e aprendizado escolar. Para tarefas de desenvolvimento de software, criação ou explicação de códigos, sugiro que você experimente ferramentas mais especializadas como o ChatGPT da OpenAI ou o Gemini do Google. Eles são excelentes para isso e poderão te ajudar melhor! 😊";
         await replaceThinkingWithMessageInSession(currentSessionId, assistantMessageId, refusalMessage);
         setIsLoading(false);
-        return; 
+        return;
       }
 
 
@@ -440,11 +445,11 @@ export default function ChatInterface() {
             updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: `Pesquisando por: "${detectedTopic}"... (até 3 páginas)` });
             const searchApiResponse = await fetch('/api/raspagem', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ termoBusca: detectedTopic, todasPaginas: true }), 
+              body: JSON.stringify({ termoBusca: detectedTopic, todasPaginas: true }),
             });
             if (!searchApiResponse.ok) throw new Error("Falha ao buscar artigos");
             const searchResults: SearchResult[] = await searchApiResponse.json();
-            const articlesToFetch = searchResults.slice(0, 3); 
+            const articlesToFetch = searchResults.slice(0, 3);
             let aggregatedContext: string[] = [];
             let aggregatedImageInfo: string[] = [];
 
@@ -459,7 +464,7 @@ export default function ChatInterface() {
                 if (!contentApiResponse.ok) { console.warn(`Falha ao buscar conteúdo para ${article.url}`); continue; }
                 const pageContent: PageContent = await contentApiResponse.json();
                 if (pageContent.conteudo && !pageContent.erro) {
-                  aggregatedContext.push(`Fonte ${i + 1}: ${pageContent.titulo}\nAutor: ${pageContent.autor || 'N/A'}\nConteúdo:\n${pageContent.conteudo.substring(0, 10000)}...`); 
+                  aggregatedContext.push(`Fonte ${i + 1}: ${pageContent.titulo}\nAutor: ${pageContent.autor || 'N/A'}\nConteúdo:\n${pageContent.conteudo.substring(0, 10000)}...`);
                   if (pageContent.imagens && pageContent.imagens.length > 0) aggregatedImageInfo.push(pageContent.imagens.map(img => `${img.legenda || pageContent.titulo || 'Imagem'} (${img.src})`).join('; '));
                 }
               }
@@ -469,16 +474,16 @@ export default function ChatInterface() {
                 searchPerformedAndFoundContext = true;
               } else {
                  updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: `Nenhum conteúdo de artigo encontrado para "${detectedTopic}". Prosseguindo com conhecimento geral...` });
-                 await new Promise(resolve => setTimeout(resolve, 1500)); 
+                 await new Promise(resolve => setTimeout(resolve, 1500));
               }
             } else {
                updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: `Nenhum artigo relevante encontrado para "${detectedTopic}". Prosseguindo com conhecimento geral...` });
-               await new Promise(resolve => setTimeout(resolve, 1500)); 
+               await new Promise(resolve => setTimeout(resolve, 1500));
             }
           }
-      } else if (flowToUse === 'simple' && (!userMessageContent && userImageDataUri)) { 
+      } else if (flowToUse === 'simple' && (!userMessageContent && userImageDataUri)) {
           updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Analisando a imagem..." });
-          await new Promise(resolve => setTimeout(resolve, 1000)); 
+          await new Promise(resolve => setTimeout(resolve, 1000));
       } else if (flowToUse === 'simple' && ( !isSearchEnabled || (detectedQueryTypeResult && (detectedQueryTypeResult.queryType === 'IMAGE_ANALYSIS' || detectedQueryTypeResult.queryType === 'GENERAL_CONVERSATION' )) ) ) {
          updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Preparando uma resposta direta..." });
          await new Promise(resolve => setTimeout(resolve, 1000));
@@ -489,7 +494,7 @@ export default function ChatInterface() {
       if (flowToUse === 'academic') {
         if (searchPerformedAndFoundContext) {
             finalStepMessage = "Gerando resposta com o novo contexto...";
-        } else if (isSearchEnabled && userMessageContent) { 
+        } else if (isSearchEnabled && userMessageContent) {
             finalStepMessage = "Gerando resposta com base no conhecimento geral...";
         }
       } else if (flowToUse === 'simple' && userImageDataUri && !userMessageContent) {
@@ -500,8 +505,8 @@ export default function ChatInterface() {
 
       const activeSessionMessagesForAI = sessions.find(s => s.id === currentSessionId)?.messages || [];
       const conversationHistoryForAI = activeSessionMessagesForAI
-        .filter(msg => !msg.isThinkingPlaceholder && msg.id !== assistantMessageId && msg.id !== userMessage.id) 
-        .slice(-6) 
+        .filter(msg => !msg.isThinkingPlaceholder && msg.id !== assistantMessageId && msg.id !== userMessage.id)
+        .slice(-6)
         .map(msg => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
 
       let aiResultText: string;
@@ -513,7 +518,7 @@ export default function ChatInterface() {
         };
         const simpleResult: GenerateSimpleResponseOutput = await generateSimpleResponse(simpleInput);
         aiResultText = simpleResult.response;
-      } else { 
+      } else {
         const academicInput: GenerateAcademicResponseInput = {
           prompt: userMessage.content, userImageInputDataUri: userMessage.imageDataUri,
           persona: aiPersona || undefined, rules: aiRules || undefined,
@@ -523,7 +528,7 @@ export default function ChatInterface() {
         const academicResult: GenerateAcademicResponseOutput = await generateAcademicResponse(academicInput);
         aiResultText = academicResult.response;
       }
-      
+
       await replaceThinkingWithMessageInSession(currentSessionId, assistantMessageId, aiResultText);
 
     } catch (error) {
@@ -565,9 +570,9 @@ export default function ChatInterface() {
     <SidebarProvider defaultOpen={true}>
       <Sidebar collapsible="icon" className="border-r h-svh">
         <SidebarHeader className="p-3">
-          <Button 
-            variant="outline" 
-            className="w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2" 
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2"
             onClick={handleStartNewChat}
             disabled={disableNewChatButton}
             title={disableNewChatButton ? "Envie uma mensagem na conversa atual para iniciar uma nova." : "Iniciar nova conversa"}
@@ -576,8 +581,8 @@ export default function ChatInterface() {
             <span className="group-data-[collapsible=icon]:hidden">Nova Conversa</span>
           </Button>
         </SidebarHeader>
-        <ScrollArea className="flex-1 min-h-0"> 
-          <div className="p-1 pt-0"> 
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="p-1 pt-0">
             <SidebarMenu>
               {sortedSessions.map((session) => (
                 <SidebarMenuItem key={session.id}>
@@ -604,7 +609,7 @@ export default function ChatInterface() {
         <div className="flex flex-col h-screen bg-background text-foreground">
           <header className="p-2 border-b flex justify-between items-center shadow-sm sticky top-0 bg-background z-10">
             <div className="flex items-center gap-1">
-                 <SidebarTrigger className="md:hidden" /> 
+                 <SidebarTrigger className="md:hidden" />
                  <h1 className="text-xl md:text-2xl font-headline font-semibold text-primary">Cabulador</h1>
             </div>
             <div className="flex items-center gap-2">
@@ -648,7 +653,12 @@ export default function ChatInterface() {
                 </div>
               )}
               {currentMessages.map((msg) => (
-                <ChatMessage key={msg.id} message={msg} typingSpeed={typingSpeed} />
+                <ChatMessage
+                  key={msg.id}
+                  message={msg}
+                  typingSpeed={typingSpeed}
+                  renderMarkdown={(content) => <MarkdownWithCode content={content} />}
+                />
               ))}
             </div>
           </ScrollArea>
@@ -686,6 +696,4 @@ export default function ChatInterface() {
     </SidebarProvider>
   );
 }
-    
-
     
