@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input as DefaultInput } from "@/components/ui/input" // Renamed to avoid conflict
 import { Separator } from "@/components/ui/separator"
-import { Sheet, SheetContent, SheetTrigger as DefaultSheetTrigger } from "@/components/ui/sheet" // SheetTrigger might be used by SidebarTrigger
+import { Sheet, SheetContent, SheetTitle, SheetTrigger as DefaultSheetTrigger } from "@/components/ui/sheet" // SheetTrigger might be used by SidebarTrigger
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -220,6 +220,7 @@ const Sidebar = React.forwardRef<
              style={{ "--sidebar-width-mobile": SIDEBAR_WIDTH_MOBILE } as React.CSSProperties}
             side={side}
           >
+            <SheetTitle className="sr-only">Menu Principal</SheetTitle>
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
         </Sheet>
