@@ -342,7 +342,7 @@ export default function ChatInterface() {
     setIsLoading(true);
     let userImageDataUri: string | undefined = undefined;
 
-    if (selectedImageFile && !promptTextOverride) { // Only process selected image if not a suggestion click
+    if (selectedImageFile && !promptTextOverride) { 
       try {
         userImageDataUri = await fileToDataUri(selectedImageFile);
       } catch (error) {
@@ -373,7 +373,7 @@ export default function ChatInterface() {
     }
 
 
-    if (!promptTextOverride) { // Only clear input if not a suggestion click
+    if (!promptTextOverride) { 
         setInputValue("");
         clearSelectedImage();
     }
@@ -412,7 +412,15 @@ export default function ChatInterface() {
           detectedQueryTypeResult = await queryTypeResponse.json();
       }
 
-      if (userImageDataUri || !isSearchEnabled || (detectedQueryTypeResult && (detectedQueryTypeResult.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult.queryType === 'IMAGE_ANALYSIS' || detectedQueryTypeResult.queryType === 'GENERAL_CONVERSATION'))) {
+      if (detectedQueryTypeResult && detectedQueryTypeResult.queryType === 'CODING_TECHNICAL') {
+        const refusalMessage = "Olá! Sou uma IA focada em te ajudar com seus estudos e aprendizado escolar. Para tarefas de desenvolvimento de software, criação ou explicação de códigos, sugiro que você experimente ferramentas mais especializadas como o ChatGPT da OpenAI ou o Gemini do Google. Eles são excelentes para isso e poderão te ajudar melhor! 😊";
+        await replaceThinkingWithMessageInSession(currentSessionId, assistantMessageId, refusalMessage);
+        setIsLoading(false);
+        return; 
+      }
+
+
+      if (userImageDataUri || !isSearchEnabled || (detectedQueryTypeResult && (detectedQueryTypeResult.queryType === 'IMAGE_ANALYSIS' || detectedQueryTypeResult.queryType === 'GENERAL_CONVERSATION'))) {
         flowToUse = 'simple';
       } else {
         flowToUse = 'academic';
@@ -471,7 +479,7 @@ export default function ChatInterface() {
       } else if (flowToUse === 'simple' && (!userMessageContent && userImageDataUri)) { 
           updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Analisando a imagem..." });
           await new Promise(resolve => setTimeout(resolve, 1000)); 
-      } else if (flowToUse === 'simple' && ( !isSearchEnabled || (detectedQueryTypeResult && (detectedQueryTypeResult.queryType === 'CODING_TECHNICAL' || detectedQueryTypeResult.queryType === 'GENERAL_CONVERSATION' || detectedQueryTypeResult.queryType === 'IMAGE_ANALYSIS')) ) ) {
+      } else if (flowToUse === 'simple' && ( !isSearchEnabled || (detectedQueryTypeResult && (detectedQueryTypeResult.queryType === 'IMAGE_ANALYSIS' || detectedQueryTypeResult.queryType === 'GENERAL_CONVERSATION' )) ) ) {
          updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Preparando uma resposta direta..." });
          await new Promise(resolve => setTimeout(resolve, 1000));
       }
@@ -678,4 +686,6 @@ export default function ChatInterface() {
     </SidebarProvider>
   );
 }
+    
+
     
