@@ -7,7 +7,7 @@ import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { SendHorizontal, Loader2, PlusCircle, Settings, SearchCheck, SearchSlash, Paperclip, X, MessageSquareText } from "lucide-react";
+import { SendHorizontal, Loader2, PlusCircle, Settings, SearchCheck, SearchSlash, Paperclip, X, MessageSquareText, Sparkles } from "lucide-react";
 import ChatMessage from "@/components/chat-message";
 import SettingsPopover from "@/components/settings-popover";
 import ThemeToggleButton from "./theme-toggle-button";
@@ -60,6 +60,13 @@ const AI_RULES_STORAGE_KEY = "cabulador_rules";
 const SEARCH_ENABLED_STORAGE_KEY = "cabulador_search_enabled";
 const SESSIONS_STORAGE_KEY = "cabulador_sessions";
 const ACTIVE_SESSION_ID_STORAGE_KEY = "cabulador_active_session_id";
+
+const SUGGESTION_PROMPTS = [
+  "Como funciona a teoria da relatividade?",
+  "Escreva um poema sobre o oceano.",
+  "Qual a diferença entre UI e UX Design?",
+  "Me dê uma receita simples de panquecas."
+];
 
 
 export default function ChatInterface() {
@@ -316,9 +323,10 @@ export default function ChatInterface() {
       reader.readAsDataURL(file);
     });
 
-  const handleSendMessage = async (e?: FormEvent) => {
+  const handleSendMessage = async (promptTextOverride?: string, e?: FormEvent) => {
     if (e) e.preventDefault();
-    const userMessageContent = inputValue.trim();
+    const userMessageContent = promptTextOverride ?? inputValue.trim();
+
     if ((!userMessageContent && !selectedImageFile) || isLoading) return;
 
     let currentSessionId = activeSessionId;
@@ -335,7 +343,7 @@ export default function ChatInterface() {
     setIsLoading(true);
     let userImageDataUri: string | undefined = undefined;
 
-    if (selectedImageFile) {
+    if (selectedImageFile && !promptTextOverride) { // Only process selected image if not a suggestion click
       try {
         userImageDataUri = await fileToDataUri(selectedImageFile);
       } catch (error) {
@@ -366,8 +374,11 @@ export default function ChatInterface() {
     }
 
 
-    setInputValue("");
-    clearSelectedImage();
+    if (!promptTextOverride) { // Only clear input if not a suggestion click
+        setInputValue("");
+        clearSelectedImage();
+    }
+
 
     const assistantMessageId = (Date.now() + 1).toString();
     const thinkingMessage: Message = {
@@ -524,6 +535,12 @@ export default function ChatInterface() {
     }
   };
 
+  const handleSuggestionClick = (suggestion: string) => {
+    if (isLoading) return;
+    handleSendMessage(suggestion);
+  };
+
+
   const handleInputKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -539,7 +556,7 @@ export default function ChatInterface() {
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <Sidebar collapsible="icon" className="border-r h-svh"> {/* Alterado min-h-svh para h-svh */}
+      <Sidebar collapsible="icon" className="border-r h-svh">
         <SidebarHeader className="p-3">
           <Button 
             variant="outline" 
@@ -553,7 +570,7 @@ export default function ChatInterface() {
           </Button>
         </SidebarHeader>
         <ScrollArea className="flex-1 min-h-0"> 
-          <div className="p-1 pt-0"> 
+          <div className="p-1 pt-0 h-full"> 
             <SidebarMenu>
               {sortedSessions.map((session) => (
                 <SidebarMenuItem key={session.id}>
@@ -603,6 +620,26 @@ export default function ChatInterface() {
 
           <ScrollArea className="flex-1 p-4" viewportRef={chatContainerRef}>
             <div className="space-y-4">
+              {currentMessages.length === 0 && !isLoading && (
+                <div className="flex flex-col items-center justify-center pt-10 text-center">
+                  <Sparkles className="h-10 w-10 text-primary mb-4" />
+                  <h2 className="text-xl font-semibold text-foreground mb-1">Como posso te ajudar hoje?</h2>
+                  <p className="text-sm text-muted-foreground mb-6">Clique em uma sugestão ou digite sua pergunta abaixo.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl w-full">
+                    {SUGGESTION_PROMPTS.map((suggestion, index) => (
+                      <Button
+                        key={index}
+                        variant="outline"
+                        className="p-3 h-auto text-sm text-left justify-start leading-snug hover:bg-accent/10 dark:hover:bg-accent/20"
+                        onClick={() => handleSuggestionClick(suggestion)}
+                        disabled={isLoading}
+                      >
+                        {suggestion}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {currentMessages.map((msg) => (
                 <ChatMessage key={msg.id} message={msg} typingSpeed={typingSpeed} />
               ))}
@@ -618,7 +655,7 @@ export default function ChatInterface() {
                 </Button>
               </div>
             )}
-            <form onSubmit={handleSendMessage} className="flex gap-2 items-start" ref={formRef}>
+            <form onSubmit={(e) => handleSendMessage(undefined, e)} className="flex gap-2 items-start" ref={formRef}>
               <input type="file" ref={fileInputRef} accept="image/png, image/jpeg, image/webp, image/gif" onChange={handleImageFileChange} className="hidden" id="imageUpload" aria-label="Upload de imagem" />
               <Button type="button" variant="ghost" size="icon" className="rounded-full flex-shrink-0 mt-1" onClick={() => fileInputRef.current?.click()} disabled={isLoading} aria-label="Anexar imagem">
                 <Paperclip className="h-5 w-5 text-muted-foreground hover:text-primary" />
