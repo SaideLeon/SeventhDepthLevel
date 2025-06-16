@@ -23,7 +23,7 @@ interface Message {
   isThinkingPlaceholder?: boolean;
   startTime?: number;
   currentProcessingStepMessage?: string;
-  applyTypewriter?: boolean; // Added from chat-interface
+  applyTypewriter?: boolean;
 }
 
 interface ChatMessageProps {
@@ -60,18 +60,11 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
   }, [message.isThinkingPlaceholder, message.startTime]);
 
   useEffect(() => {
-    // Determine if the content should be considered "complete" (i.e., skip typewriter)
-    let shouldBeComplete = true; // Default to complete (no typing)
-
+    let shouldBeComplete = true;
     if (message.role === "assistant" && !message.isThinkingPlaceholder && message.applyTypewriter === true) {
-      // This is a new AI message that needs typing
       shouldBeComplete = false;
     }
-    // User messages, placeholders, and historical AI messages (applyTypewriter is not true or undefined)
-    // are considered "complete" from the start.
-    
     setIsTypingComplete(shouldBeComplete);
-
   }, [message.role, message.isThinkingPlaceholder, message.applyTypewriter, message.id, message.content]);
 
 
@@ -104,67 +97,59 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
     }
   };
 
+  const markdownComponents = {
+    pre: ({ node, children, ...props }: any) => {
+        if (children && Array.isArray(children) && children.length > 0) {
+          const codeElement = children[0] as React.ReactElement;
+          if (codeElement && codeElement.type === 'code' && codeElement.props) {
+            const { className, children: codeContentNode } = codeElement.props;
+            const language = className?.replace(/^language-/, '') || 'plaintext';
+            
+            let finalCodeString = '';
+            if (Array.isArray(codeContentNode)) {
+              finalCodeString = codeContentNode.map(String).join('');
+            } else if (codeContentNode !== null && codeContentNode !== undefined) {
+              finalCodeString = String(codeContentNode);
+            }
+            finalCodeString = finalCodeString.replace(/\n$/, '');
+
+            const filename = language !== 'plaintext' && language !== '' ? `code.${language}` : undefined;
+
+            return <VSCodeCodeBlock language={language} code={finalCodeString} filename={filename} />;
+          }
+        }
+        return <pre {...props} className="bg-muted p-2 rounded-md overflow-x-auto my-2 text-sm">{children}</pre>; 
+      },
+      code({ node, inline, className, children, ...props }: any) {
+        if (inline) {
+          return (
+            <code className="bg-muted text-muted-foreground px-1.5 py-0.5 rounded-sm font-mono text-xs mx-0.5" {...props}>
+              {children}
+            </code>
+          );
+        }
+        // Fallback for code blocks not caught by 'pre' (should be rare with remarkGfm)
+        const match = /language-(\w+)/.exec(className || '');
+        const lang = match ? match[1] : 'plaintext';
+        const codeString = Array.isArray(children) ? children.join('') : String(children);
+        return <VSCodeCodeBlock language={lang} code={codeString.replace(/\n$/, '')} filename={lang !== 'plaintext' ? `code.${lang}`: undefined}/>;
+      },
+       img: ({ node, ...props }: any) => ( 
+        <span className="block my-3 rounded-lg overflow-hidden border shadow-sm">
+          <Image
+            src={props.src || "https://placehold.co/600x400.png"}
+            alt={props.alt || "AI generated image"}
+            layout="responsive"
+            width={700}
+            height={400}
+            className="object-contain"
+            data-ai-hint="illustration diagram"
+          />
+        </span>
+      ),
+  };
+
   const renderContent = () => {
-    const markdownComponents = {
-        pre: ({ node, children, ...props }: any) => {
-            if (children && Array.isArray(children) && children.length > 0) {
-              const codeElement = children[0] as React.ReactElement;
-              if (codeElement && codeElement.type === 'code' && codeElement.props) {
-                const { className, children: codeContentNode } = codeElement.props;
-                const language = className?.replace(/^language-/, '') || 'plaintext';
-                
-                let finalCodeString = '';
-                if (Array.isArray(codeContentNode)) {
-                  finalCodeString = codeContentNode.map(String).join('');
-                } else if (codeContentNode !== null && codeContentNode !== undefined) {
-                  finalCodeString = String(codeContentNode);
-                }
-                finalCodeString = finalCodeString.replace(/\n$/, '');
-
-                const filename = language !== 'plaintext' && language !== '' ? `code.${language}` : undefined;
-
-                return <VSCodeCodeBlock language={language} code={finalCodeString} filename={filename} />;
-              }
-            }
-            return <pre {...props} className="bg-muted p-2 rounded-md overflow-x-auto my-2 text-sm">{children}</pre>; 
-          },
-          code({ node, inline, className, children, ...props }: any) {
-            if (inline) {
-              return (
-                <code className="bg-muted text-muted-foreground px-1.5 py-0.5 rounded-sm font-mono text-xs mx-0.5" {...props}>
-                  {children}
-                </code>
-              );
-            }
-            const match = /language-(\w+)/.exec(className || '');
-            const lang = match ? match[1] : 'plaintext';
-            const codeString = Array.isArray(children) ? children.join('') : String(children);
-            return <VSCodeCodeBlock language={lang} code={codeString.replace(/\n$/, '')} filename={lang !== 'plaintext' ? `code.${lang}`: undefined}/>;
-          },
-           img: ({ node, ...props }: any) => ( 
-            <span className="block my-3 rounded-lg overflow-hidden border shadow-sm">
-              <Image
-                src={props.src || "https://placehold.co/600x400.png"}
-                alt={props.alt || "AI generated image"}
-                layout="responsive"
-                width={700}
-                height={400}
-                className="object-contain"
-                data-ai-hint="illustration diagram"
-              />
-            </span>
-          ),
-    };
-
-    const markdownContent = (
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={markdownComponents}
-      >
-        {message.content}
-      </ReactMarkdown>
-    );
-
     const userImageElement = message.imageDataUri && isUser ? (
       <div className="my-2 block rounded-lg overflow-hidden border shadow-sm max-w-xs">
         <Image
@@ -182,7 +167,11 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
       return (
         <div className="flex flex-col">
           {userImageElement}
-          {message.content && markdownContent}
+          {message.content && (
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              {message.content}
+            </ReactMarkdown>
+          )}
           {!message.content && userImageElement && <span className="text-muted-foreground italic text-xs">(Imagem enviada)</span>}
         </div>
       );
@@ -202,11 +191,25 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
       );
     }
 
+    // AI message
     if (!isTypingComplete) {
-      return <TypewriterEffect text={message.content} speed={typingSpeed} onComplete={handleTypingComplete} />;
+      return (
+        <TypewriterEffect
+          text={message.content}
+          speed={typingSpeed}
+          onComplete={handleTypingComplete}
+          markdownComponents={markdownComponents}
+          remarkPlugins={[remarkGfm]}
+        />
+      );
     }
 
-    return markdownContent;
+    // AI message, typing complete
+    return (
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+        {message.content}
+      </ReactMarkdown>
+    );
   };
 
 
@@ -231,7 +234,11 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
             isUser ? "bg-primary text-primary-foreground" : "bg-card relative" 
           )}
         >
-          <CardContent className={cn("p-3 text-sm break-words", {"prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2": (isUser || (message.role === 'assistant' && !message.isThinkingPlaceholder)) })}>
+          <CardContent className={cn(
+            "p-3 text-sm break-words", 
+            // Apply prose if it's a user message OR an assistant message that's not a placeholder
+            {"prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2": isUser || (message.role === 'assistant' && !message.isThinkingPlaceholder)}
+            )}>
             {renderContent()}
           </CardContent>
           {!isUser && isTypingComplete && !message.isThinkingPlaceholder && message.content && (
@@ -257,3 +264,4 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
     </div>
   );
 }
+

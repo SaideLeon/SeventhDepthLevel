@@ -2,21 +2,32 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import type { Options as ReactMarkdownOptions } from "react-markdown";
 
 interface TypewriterEffectProps {
   text: string;
   speed?: number; // Milliseconds per character
   onComplete?: () => void; // Callback when typing is finished
+  // Props for ReactMarkdown
+  markdownComponents?: ReactMarkdownOptions["components"];
+  remarkPlugins?: ReactMarkdownOptions["remarkPlugins"];
 }
 
-export default function TypewriterEffect({ text, speed = 50, onComplete }: TypewriterEffectProps) {
+export default function TypewriterEffect({
+  text,
+  speed = 50,
+  onComplete,
+  markdownComponents,
+  remarkPlugins,
+}: TypewriterEffectProps) {
   const [displayedText, setDisplayedText] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
-    setDisplayedText(""); 
+    setDisplayedText("");
     setCurrentIndex(0);
-  }, [text]);
+  }, [text]); // Reset when the source text changes
 
   useEffect(() => {
     if (!text) {
@@ -39,8 +50,18 @@ export default function TypewriterEffect({ text, speed = 50, onComplete }: Typew
 
   return (
     <>
-      {displayedText || <>&nbsp;</>}
-      {currentIndex < text.length && <span className="inline-block w-px h-4 bg-foreground animate-pulse ml-0.5" aria-hidden="true"></span>}
+      <ReactMarkdown
+        components={markdownComponents}
+        remarkPlugins={remarkPlugins}
+      >
+        {displayedText || "\u00A0"}{/* Use non-breaking space to maintain layout if empty */}
+      </ReactMarkdown>
+      {currentIndex < text.length && (
+        <span
+          className="inline-block w-px h-4 bg-foreground animate-pulse ml-0.5"
+          aria-hidden="true"
+        ></span>
+      )}
     </>
   );
 }
