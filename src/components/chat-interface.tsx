@@ -62,10 +62,10 @@ const SESSIONS_STORAGE_KEY = "cabulador_sessions";
 const ACTIVE_SESSION_ID_STORAGE_KEY = "cabulador_active_session_id";
 
 const SUGGESTION_PROMPTS = [
-  "Como funciona a teoria da relatividade?",
-  "Escreva um poema sobre o oceano.",
-  "Qual a diferença entre UI e UX Design?",
-  "Me dê uma receita simples de panquecas."
+  "O que é fotossíntese?",
+  "Explique o sistema digestivo.",
+  "O que é pretérito perfeito?",
+  "Quais foram as principais causas da Primeira Guerra Mundial?"
 ];
 
 
@@ -570,7 +570,7 @@ export default function ChatInterface() {
           </Button>
         </SidebarHeader>
         <ScrollArea className="flex-1 min-h-0"> 
-          <div className="p-1 pt-0 h-full"> 
+          <div className="p-1 pt-0"> 
             <SidebarMenu>
               {sortedSessions.map((session) => (
                 <SidebarMenuItem key={session.id}>
