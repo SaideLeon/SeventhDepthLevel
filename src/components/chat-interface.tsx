@@ -12,7 +12,6 @@ import ChatMessage from "@/components/chat-message";
 import SettingsPopover from "@/components/settings-popover";
 import ThemeToggleButton from "./theme-toggle-button";
 import {
-  SidebarProvider,
   Sidebar,
   SidebarHeader,
   SidebarMenu,
@@ -20,6 +19,7 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarTrigger,
+  useSidebar, 
 } from "@/components/ui/sidebar";
 
 
@@ -86,6 +86,7 @@ export default function ChatInterface() {
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { isMobile, setOpenMobile } = useSidebar(); 
 
   useEffect(() => {
     const storedSpeed = localStorage.getItem(TYPING_SPEED_STORAGE_KEY);
@@ -133,7 +134,7 @@ export default function ChatInterface() {
             hasAiGeneratedTitle: s.hasAiGeneratedTitle || false,
             messages: s.messages.map(m => ({
                 ...m,
-                applyTypewriter: false // Force false for ALL messages from localStorage
+                applyTypewriter: false 
             }))
         }));
       } catch (e) {
@@ -567,7 +568,7 @@ export default function ChatInterface() {
 
 
   return (
-    <SidebarProvider defaultOpen={true}>
+    <>
       <Sidebar collapsible="icon" className="border-r h-svh">
         <SidebarHeader className="p-3">
           <Button
@@ -587,7 +588,12 @@ export default function ChatInterface() {
               {sortedSessions.map((session) => (
                 <SidebarMenuItem key={session.id}>
                   <SidebarMenuButton
-                    onClick={() => setActiveSessionId(session.id)}
+                    onClick={() => {
+                      setActiveSessionId(session.id);
+                      if (isMobile) {
+                        setOpenMobile(false);
+                      }
+                    }}
                     isActive={session.id === activeSessionId}
                     className={cn(
                         "w-full text-left justify-start group-data-[collapsible=icon]:justify-center",
@@ -657,7 +663,6 @@ export default function ChatInterface() {
                   key={msg.id}
                   message={msg}
                   typingSpeed={typingSpeed}
-                  renderMarkdown={(content) => <MarkdownWithCode content={content} />}
                 />
               ))}
             </div>
@@ -693,7 +698,7 @@ export default function ChatInterface() {
           </div>
         </div>
       </SidebarInset>
-    </SidebarProvider>
+    </>
   );
 }
     

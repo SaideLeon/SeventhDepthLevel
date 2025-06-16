@@ -1,5 +1,11 @@
+
 import ChatInterface from '@/components/chat-interface';
+import { SidebarProvider } from '@/components/ui/sidebar';
 
 export default function Home() {
-  return <ChatInterface />;
+  return (
+    <SidebarProvider defaultOpen={true}>
+      <ChatInterface />
+    </SidebarProvider>
+  );
 }
