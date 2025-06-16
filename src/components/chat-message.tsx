@@ -103,66 +103,89 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
   const handleDownloadPdf = async () => {
     const elementToCapture = contentToPdfRef.current;
     if (!elementToCapture || !message.content) {
-      toast({
-        title: "Erro ao Baixar PDF",
-        description: "Nenhum conteúdo para baixar.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro ao Baixar PDF", description: "Nenhum conteúdo para baixar.", variant: "destructive" });
       return;
     }
 
-    toast({
-      title: "Preparando PDF...",
-      description: "Aguarde enquanto o documento é gerado.",
-    });
+    toast({ title: "Preparando PDF...", description: "Aguarde enquanto o documento é gerado." });
+
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    const clonedElementContainer = document.createElement('div');
+
+    // Base styles for the off-screen container
+    clonedElementContainer.style.position = 'absolute';
+    clonedElementContainer.style.left = '-9999px';
+    clonedElementContainer.style.top = '-9999px';
+    clonedElementContainer.style.width = '1024px'; // A good width for A4-like rendering
+    clonedElementContainer.style.padding = '20px'; // Simulate page margins
+    clonedElementContainer.style.fontFamily = 'Inter, sans-serif'; // Consistent font
+    clonedElementContainer.style.background = '#ffffff'; // Force white background for PDF
+
+    // Apply theme and prose classes
+    if (isDarkMode) {
+      clonedElementContainer.classList.add('dark'); // For prose-invert if needed by styles
+    }
+    // These classes ensure markdown is styled correctly
+    clonedElementContainer.classList.add(
+        'markdown-container', // From globals.css, sets up prose context
+        'prose',
+        'prose-sm',
+        'dark:prose-invert', // Will activate if .dark is on container
+        'max-w-none'         // Allows prose to fill the 1024px width
+    );
+    // Force foreground color based on theme for text within prose
+    clonedElementContainer.style.color = isDarkMode ? 'hsl(var(--foreground))' : 'hsl(var(--foreground))';
+
+
+    const clonedContent = elementToCapture.cloneNode(true) as HTMLElement;
+    // Remove any interactive elements that shouldn't be in the PDF from the clone if necessary
+    // Example: clonedContent.querySelectorAll('.no-pdf-element').forEach(el => el.remove());
+    clonedElementContainer.appendChild(clonedContent);
+    document.body.appendChild(clonedElementContainer);
 
     try {
-      const canvas = await html2canvas(elementToCapture, {
-        scale: 2, 
+      const canvas = await html2canvas(clonedElementContainer, {
+        scale: 2, // Good quality
         useCORS: true,
-        logging: false, // Disable html2canvas logging to console
-        onclone: (document) => { // Ensure styles are applied, especially for dark mode
-            const originalBodyClass = document.body.className;
-            document.body.className = `${originalBodyClass} ${document.documentElement.className}`;
-        }
+        logging: false,
+        backgroundColor: '#ffffff', // Explicitly set background for canvas
+        // `onclone` is less necessary now as we style the container before appending
       });
-      
+
+      // Clean up the temporary element from the DOM
+      document.body.removeChild(clonedElementContainer);
+
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
+      const margin = 15; // PDF margin in mm
 
       const imgProps = pdf.getImageProperties(imgData);
-      const canvasWidth = imgProps.width;
-      const canvasHeight = imgProps.height;
+      const aspectRatio = imgProps.width / imgProps.height;
 
-      const aspectRatio = canvasWidth / canvasHeight;
-      let newImgWidth = pdfWidth - 20; 
+      let newImgWidth = pdfWidth - 2 * margin;
       let newImgHeight = newImgWidth / aspectRatio;
 
-      if (newImgHeight > pdfHeight - 20) { 
-        newImgHeight = pdfHeight - 20;
+      if (newImgHeight > pdfHeight - 2 * margin) {
+        newImgHeight = pdfHeight - 2 * margin;
         newImgWidth = newImgHeight * aspectRatio;
       }
-      
-      const xOffset = (pdfWidth - newImgWidth) / 2;
-      const yOffset = 10; 
+
+      const xOffset = margin + ((pdfWidth - 2 * margin) - newImgWidth) / 2; // Center content
+      const yOffset = margin;
 
       pdf.addImage(imgData, 'PNG', xOffset, yOffset, newImgWidth, newImgHeight);
       pdf.save(`Cabulador-Resposta-${message.id.substring(0,6)}.pdf`);
 
-      toast({
-        title: "Download Iniciado",
-        description: "Seu PDF está sendo baixado.",
-      });
+      toast({ title: "Download Iniciado", description: "Seu PDF está sendo baixado." });
 
     } catch (error) {
       console.error("Erro ao gerar PDF:", error);
-      toast({
-        title: "Erro ao Baixar PDF",
-        description: "Não foi possível gerar o PDF. Tente novamente.",
-        variant: "destructive",
-      });
+      if (clonedElementContainer.parentNode) { // Ensure cleanup on error
+           document.body.removeChild(clonedElementContainer);
+      }
+      toast({ title: "Erro ao Baixar PDF", description: "Não foi possível gerar o PDF. Tente novamente.", variant: "destructive" });
     }
   };
 
@@ -305,6 +328,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
             "p-3 text-sm break-words", 
             {"prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2": isUser || (message.role === 'assistant' && !message.isThinkingPlaceholder)}
             )}>
+            {/* The ref is now applied to the direct content wrapper */}
             <div ref={contentToPdfRef}>
               {renderContent()}
             </div>
@@ -343,4 +367,3 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
     </div>
   );
 }
-
