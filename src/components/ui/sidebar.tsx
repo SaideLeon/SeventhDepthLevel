@@ -232,7 +232,7 @@ const Sidebar = React.forwardRef<
         ref={ref}
         data-testid="desktop-sidebar-container"
         className={cn(
-          "group peer hidden md:flex flex-col text-sidebar-foreground bg-sidebar transition-all duration-300 ease-in-out",
+          "group peer hidden md:flex flex-col h-full text-sidebar-foreground bg-sidebar transition-all duration-300 ease-in-out", // Added h-full
            open ? "w-[--sidebar-width]" : "w-[--sidebar-width-icon]",
            side === "left" ? "border-r border-sidebar-border" : "border-l border-sidebar-border",
            className
