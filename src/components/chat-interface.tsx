@@ -20,7 +20,6 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarTrigger,
-  SidebarContent,
 } from "@/components/ui/sidebar";
 
 
@@ -630,7 +629,7 @@ export default function ChatInterface() {
                       <Button
                         key={index}
                         variant="outline"
-                        className="p-3 h-auto text-sm text-left justify-start leading-snug hover:bg-accent/10 dark:hover:bg-accent/20"
+                        className="p-3 h-auto text-sm text-left justify-start leading-snug whitespace-normal hover:bg-accent/10 dark:hover:bg-accent/20"
                         onClick={() => handleSuggestionClick(suggestion)}
                         disabled={isLoading}
                       >
