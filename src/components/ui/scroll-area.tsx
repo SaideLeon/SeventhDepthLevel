@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -20,7 +21,7 @@ const ScrollArea = React.forwardRef<
     {...props}
   >
     <ScrollAreaPrimitive.Viewport
-      className="h-full w-full rounded-[inherit]"
+      className={cn("h-full w-full rounded-[inherit] overflow-auto", className && className.includes("min-h-0") ? "min-h-0" : "")} // Added overflow-auto
       ref={viewportRef}
     >
       {children}
