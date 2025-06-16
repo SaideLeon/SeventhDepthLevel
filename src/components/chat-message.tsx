@@ -1,9 +1,9 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { User, Bot, Loader2, Copy as CopyIcon, Check as CheckIcon } from "lucide-react";
+import { User, Bot, Loader2, Copy as CopyIcon, Check as CheckIcon, Download } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import VSCodeCodeBlock from "./vscode-code-block";
 import { useToast } from "@/hooks/use-toast";
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 
 interface Message {
@@ -37,6 +39,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
   const [isTypingComplete, setIsTypingComplete] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const { toast } = useToast();
+  const contentToPdfRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | undefined;
@@ -97,6 +100,73 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
     }
   };
 
+  const handleDownloadPdf = async () => {
+    const elementToCapture = contentToPdfRef.current;
+    if (!elementToCapture || !message.content) {
+      toast({
+        title: "Erro ao Baixar PDF",
+        description: "Nenhum conteúdo para baixar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Preparando PDF...",
+      description: "Aguarde enquanto o documento é gerado.",
+    });
+
+    try {
+      const canvas = await html2canvas(elementToCapture, {
+        scale: 2, 
+        useCORS: true,
+        logging: false, // Disable html2canvas logging to console
+        onclone: (document) => { // Ensure styles are applied, especially for dark mode
+            const originalBodyClass = document.body.className;
+            document.body.className = `${originalBodyClass} ${document.documentElement.className}`;
+        }
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      const imgProps = pdf.getImageProperties(imgData);
+      const canvasWidth = imgProps.width;
+      const canvasHeight = imgProps.height;
+
+      const aspectRatio = canvasWidth / canvasHeight;
+      let newImgWidth = pdfWidth - 20; 
+      let newImgHeight = newImgWidth / aspectRatio;
+
+      if (newImgHeight > pdfHeight - 20) { 
+        newImgHeight = pdfHeight - 20;
+        newImgWidth = newImgHeight * aspectRatio;
+      }
+      
+      const xOffset = (pdfWidth - newImgWidth) / 2;
+      const yOffset = 10; 
+
+      pdf.addImage(imgData, 'PNG', xOffset, yOffset, newImgWidth, newImgHeight);
+      pdf.save(`Cabulador-Resposta-${message.id.substring(0,6)}.pdf`);
+
+      toast({
+        title: "Download Iniciado",
+        description: "Seu PDF está sendo baixado.",
+      });
+
+    } catch (error) {
+      console.error("Erro ao gerar PDF:", error);
+      toast({
+        title: "Erro ao Baixar PDF",
+        description: "Não foi possível gerar o PDF. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+
   const markdownComponents = {
     pre: ({ node, children, ...props }: any) => {
         if (children && Array.isArray(children) && children.length > 0) {
@@ -128,7 +198,6 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
             </code>
           );
         }
-        // Fallback for code blocks not caught by 'pre' (should be rare with remarkGfm)
         const match = /language-(\w+)/.exec(className || '');
         const lang = match ? match[1] : 'plaintext';
         const codeString = Array.isArray(children) ? children.join('') : String(children);
@@ -191,7 +260,6 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
       );
     }
 
-    // AI message
     if (!isTypingComplete) {
       return (
         <TypewriterEffect
@@ -204,7 +272,6 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
       );
     }
 
-    // AI message, typing complete
     return (
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
         {message.content}
@@ -236,21 +303,33 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
         >
           <CardContent className={cn(
             "p-3 text-sm break-words", 
-            // Apply prose if it's a user message OR an assistant message that's not a placeholder
             {"prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2": isUser || (message.role === 'assistant' && !message.isThinkingPlaceholder)}
             )}>
-            {renderContent()}
+            <div ref={contentToPdfRef}>
+              {renderContent()}
+            </div>
           </CardContent>
           {!isUser && isTypingComplete && !message.isThinkingPlaceholder && message.content && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleCopyText}
-              className="absolute top-1 right-1 h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
-              aria-label="Copiar texto da IA"
-            >
-              {isCopied ? <CheckIcon className="h-4 w-4 text-green-500" /> : <CopyIcon className="h-4 w-4" />}
-            </Button>
+            <div className="absolute top-1 right-1 flex space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleCopyText}
+                className="h-7 w-7 text-muted-foreground hover:text-accent focus-visible:text-accent"
+                aria-label="Copiar texto da IA"
+              >
+                {isCopied ? <CheckIcon className="h-4 w-4 text-green-500" /> : <CopyIcon className="h-4 w-4" />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleDownloadPdf}
+                className="h-7 w-7 text-muted-foreground hover:text-accent focus-visible:text-accent"
+                aria-label="Baixar resposta como PDF"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </div>
           )}
         </Card>
       </div>
