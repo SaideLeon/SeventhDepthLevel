@@ -13,9 +13,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import VSCodeCodeBlock from "./vscode-code-block";
 import { useToast } from "@/hooks/use-toast";
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-
 
 interface Message {
   id: string;
@@ -39,7 +36,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
   const [isTypingComplete, setIsTypingComplete] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const { toast } = useToast();
-  const contentToPdfRef = useRef<HTMLDivElement>(null);
+  const contentToDownloadRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | undefined;
@@ -100,120 +97,57 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
     }
   };
 
-  const handleDownloadPdf = async () => {
-    const elementToCapture = contentToPdfRef.current;
+  const handleDownloadDoc = async () => {
+    const elementToCapture = contentToDownloadRef.current;
     if (!elementToCapture || !message.content) {
-      toast({ title: "Erro ao Baixar PDF", description: "Nenhum conteúdo para baixar.", variant: "destructive" });
+      toast({ title: "Erro ao Baixar Documento", description: "Nenhum conteúdo para baixar.", variant: "destructive" });
       return;
     }
 
-    toast({ title: "Preparando PDF...", description: "Aguarde enquanto o documento é gerado." });
-
-    const clonedElementContainer = document.createElement('div');
-
-    // Base styles for the off-screen container
-    clonedElementContainer.style.position = 'absolute';
-    clonedElementContainer.style.left = '-9999px'; // Position off-screen
-    clonedElementContainer.style.top = '-9999px';
-    clonedElementContainer.style.width = '794px'; // A4 width at 96 DPI (approx 210mm)
-    clonedElementContainer.style.padding = '20px';
-    clonedElementContainer.style.background = '#ffffff'; // Force white background
-    clonedElementContainer.style.fontFamily = 'Arial, sans-serif'; // Force standard font
-    clonedElementContainer.style.color = '#000000'; // Force black text
-    
-    // Apply prose classes for structure, but override colors/fonts
-    clonedElementContainer.className = 'markdown-container prose prose-sm max-w-none';
-
-    // Override Tailwind prose CSS variables for simple black/white theme
-    // This is crucial for html2canvas to render predictable colors
-    const styleOverrides = `
-      --tw-prose-body: #000000;
-      --tw-prose-headings: #000000;
-      --tw-prose-lead: #000000;
-      --tw-prose-links: #0000EE; /* Standard blue for links */
-      --tw-prose-bold: #000000;
-      --tw-prose-counters: #000000;
-      --tw-prose-bullets: #000000;
-      --tw-prose-hr: #cccccc; /* Light gray for HR */
-      --tw-prose-quotes: #000000;
-      --tw-prose-quote-borders: #cccccc;
-      --tw-prose-captions: #000000;
-      --tw-prose-code: #000000; /* For inline code text */
-      --tw-prose-pre-code: #000000; /* For code block text */
-      --tw-prose-pre-bg: #f5f5f5; /* Light gray for code block background */
-      --tw-prose-th-borders: #cccccc;
-      --tw-prose-td-borders: #cccccc;
-      /* Invert variables are not needed as we force light theme */
-    `;
-    clonedElementContainer.style.cssText += styleOverrides;
-
-
-    const clonedContent = elementToCapture.cloneNode(true) as HTMLElement;
-    // Remove interactive elements from clone if necessary (e.g., copy buttons from code blocks)
-    // This example assumes VSCodeCodeBlock does not add its own copy button inside the captured area.
-    // If it does, those would need to be querySelected and removed from `clonedContent`.
-    
-    clonedElementContainer.appendChild(clonedContent);
-    document.body.appendChild(clonedElementContainer);
+    toast({ title: "Preparando Documento...", description: "Aguarde enquanto o arquivo .doc é gerado." });
 
     try {
-      const canvas = await html2canvas(clonedElementContainer, {
-        scale: 2, // Improves quality
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff', // Ensure canvas background is white
-        removeContainer: true, // html2canvas option to remove the container after capture
-        onclone: (documentClone) => {
-            // Apply styles to the cloned document if needed, for elements html2canvas might create
-            // For example, if VSCodeCodeBlock dynamically loads styles, this might be a place
-            // But we try to set most things on clonedElementContainer directly.
-        }
-      });
+      // Get the inner HTML of the content
+      const contentHtml = elementToCapture.innerHTML;
 
-      // html2canvas might not need explicit removal if removeContainer:true works
-      if (clonedElementContainer.parentNode) {
-        document.body.removeChild(clonedElementContainer);
-      }
+      // Construct a full HTML document string
+      // Basic styling is included to suggest a white background and black text.
+      // Word will interpret this.
+      const fullHtml = `
+        <!DOCTYPE html>
+        <html lang="pt">
+        <head>
+          <meta charset="UTF-8">
+          <title>Cabulador Resposta</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; background-color: #ffffff; color: #000000; }
+            /* Add any other specific styles for prose content if needed directly here */
+            /* For example, for code blocks (though Word's HTML import handles <pre> and <code> reasonably) */
+            pre { background-color: #f0f0f0; padding: 10px; border-radius: 5px; overflow-x: auto; }
+            code { font-family: monospace; }
+            img { max-width: 100%; height: auto; display: block; margin-top: 10px; margin-bottom: 10px; }
+          </style>
+        </head>
+        <body>
+          ${contentHtml}
+        </body>
+        </html>
+      `;
 
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const margin = 15; // PDF margin in mm
+      const blob = new Blob([fullHtml], { type: 'application/msword' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `Cabulador-Resposta-${message.id.substring(0,6)}.doc`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
 
-      const imgProps = pdf.getImageProperties(imgData);
-      const aspectRatio = imgProps.width / imgProps.height;
-
-      let newImgWidth = pdfWidth - 2 * margin;
-      let newImgHeight = newImgWidth / aspectRatio;
-
-      // Fit image within page margins, handling both portrait and landscape aspects
-      if (newImgHeight > pdfHeight - 2 * margin) {
-        newImgHeight = pdfHeight - 2 * margin;
-        newImgWidth = newImgHeight * aspectRatio;
-      }
-      
-      // Ensure the image width does not exceed the page width after height adjustment
-      if (newImgWidth > pdfWidth - 2 * margin) {
-          newImgWidth = pdfWidth - 2 * margin;
-          newImgHeight = newImgWidth / aspectRatio;
-      }
-
-
-      const xOffset = margin + Math.max(0, (pdfWidth - 2 * margin - newImgWidth) / 2); // Center if smaller
-      const yOffset = margin;
-
-      pdf.addImage(imgData, 'PNG', xOffset, yOffset, newImgWidth, newImgHeight);
-      pdf.save(`Cabulador-Resposta-${message.id.substring(0,6)}.pdf`);
-
-      toast({ title: "Download Iniciado", description: "Seu PDF está sendo baixado." });
+      toast({ title: "Download Iniciado", description: "Seu arquivo .doc está sendo baixado." });
 
     } catch (error) {
-      console.error("Erro ao gerar PDF:", error);
-      if (clonedElementContainer.parentNode) {
-           document.body.removeChild(clonedElementContainer);
-      }
-      toast({ title: "Erro ao Baixar PDF", description: "Não foi possível gerar o PDF. Tente novamente.", variant: "destructive" });
+      console.error("Erro ao gerar .doc:", error);
+      toast({ title: "Erro ao Baixar Documento", description: "Não foi possível gerar o arquivo .doc. Tente novamente.", variant: "destructive" });
     }
   };
 
@@ -239,7 +173,6 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
             return <VSCodeCodeBlock language={language} code={finalCodeString} filename={filename} />;
           }
         }
-        // Fallback pre for non-VSCodeCodeBlock scenarios (should ideally not happen with current logic)
         return <pre {...props} className="bg-muted p-2 rounded-md overflow-x-auto my-2 text-sm">{children}</pre>; 
       },
       code({ node, inline, className, children, ...props }: any) {
@@ -250,25 +183,20 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
             </code>
           );
         }
-        // This case should be handled by the `pre` component custom renderer above for block code.
-        // If it's reached, it means it's a block code not wrapped in `pre` by react-markdown,
-        // which is unusual. We'll render it as a VSCodeCodeBlock.
         const match = /language-(\w+)/.exec(className || '');
         const lang = match ? match[1] : 'plaintext';
         const codeString = Array.isArray(children) ? children.join('') : String(children);
         return <VSCodeCodeBlock language={lang} code={codeString.replace(/\n$/, '')} filename={lang !== 'plaintext' ? `code.${lang}`: undefined}/>;
       },
        img: ({ node, ...props }: any) => ( 
-        // For PDF, we might want to ensure images are not too wide and have some margin.
-        // The off-screen div's width and prose classes should handle sizing.
         <span className="block my-3 rounded-lg overflow-hidden border shadow-sm">
           <Image
             src={props.src || "https://placehold.co/600x400.png"}
             alt={props.alt || "AI generated image"}
             layout="responsive"
-            width={700} // This width is for layout responsiveness in browser
-            height={400}// This height is for layout responsiveness in browser
-            className="object-contain" // Ensures image scales within bounds
+            width={700} 
+            height={400}
+            className="object-contain" 
             data-ai-hint="illustration diagram"
           />
         </span>
@@ -330,7 +258,6 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
       );
     }
 
-    // Typist complete, render full Markdown
     return (
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
         {message.content}
@@ -342,7 +269,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
   return (
     <div
       className={cn(
-        "flex items-end gap-2 animate-in fade-in duration-500 markdown-container group", // markdown-container sets up prose context
+        "flex items-end gap-2 animate-in fade-in duration-500 markdown-container group", 
         isUser ? "justify-end" : "justify-start"
       )}
     >
@@ -357,22 +284,17 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
         <Card
           className={cn(
             "max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl shadow-md rounded-xl",
-            isUser ? "bg-primary text-primary-foreground" : "bg-card relative" // Added relative for positioning copy/download buttons
+            isUser ? "bg-primary text-primary-foreground" : "bg-card relative" 
           )}
         >
           <CardContent className={cn(
             "p-3 text-sm break-words", 
-            // Apply prose styling directly if not using markdown-container class on parent,
-            // or ensure markdown-container styles are correctly scoped.
-            // For assistant messages, prose styles are applied by `markdown-container` class on root or `renderContent` wrapper
             {"prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2": isUser || (message.role === 'assistant' && !message.isThinkingPlaceholder)}
             )}>
-            {/* The ref is now applied to the direct content wrapper for PDF generation */}
-            <div ref={contentToPdfRef}>
+            <div ref={contentToDownloadRef}>
               {renderContent()}
             </div>
           </CardContent>
-          {/* Action buttons (Copy/Download) for assistant messages */}
           {!isUser && isTypingComplete && !message.isThinkingPlaceholder && message.content && (
             <div className="absolute top-1 right-1 flex space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
               <Button
@@ -387,9 +309,9 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={handleDownloadPdf}
+                onClick={handleDownloadDoc}
                 className="h-7 w-7 text-muted-foreground hover:text-accent focus-visible:text-accent"
-                aria-label="Baixar resposta como PDF"
+                aria-label="Baixar resposta como .doc"
               >
                 <Download className="h-4 w-4" />
               </Button>
@@ -407,5 +329,3 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
     </div>
   );
 }
-
-    
