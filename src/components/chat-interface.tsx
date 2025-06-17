@@ -7,7 +7,7 @@ import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { SendHorizontal, Loader2, PlusCircle, Settings, SearchCheck, SearchSlash, Paperclip, X, MessageSquareText, Sparkles } from "lucide-react";
+import { SendHorizontal, Loader2, PlusCircle, Settings, SearchCheck, SearchSlash, Paperclip, X, MessageSquareText, Sparkles, User } from "lucide-react";
 import ChatMessage from "@/components/chat-message";
 import SettingsPopover from "@/components/settings-popover";
 import ThemeToggleButton from "./theme-toggle-button";
@@ -17,9 +17,10 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarFooter, // Added SidebarFooter
   SidebarInset,
   SidebarTrigger,
-  useSidebar, 
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 
@@ -85,7 +86,7 @@ export default function ChatInterface() {
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const { isMobile, setOpenMobile } = useSidebar(); 
+  const { isMobile, setOpenMobile } = useSidebar();
 
   useEffect(() => {
     const storedSpeed = localStorage.getItem(TYPING_SPEED_STORAGE_KEY);
@@ -134,7 +135,7 @@ export default function ChatInterface() {
             hasAiGeneratedTitle: s.hasAiGeneratedTitle || false, // Ensure this field exists
             messages: s.messages.map(m => ({
                 ...m,
-                applyTypewriter: false 
+                applyTypewriter: false
             }))
         }));
       } catch (e) {
@@ -586,6 +587,14 @@ export default function ChatInterface() {
   const sortedSessions = [...sessions].sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt);
   const disableNewChatButton = !!activeSession && activeSession.messages.length === 0;
 
+  const handleProfileClick = () => {
+    // Placeholder action for profile click
+    toast({ title: "Perfil do Usuário", description: "Funcionalidade de perfil ainda não implementada." });
+    if (isMobile) {
+        setOpenMobile(false);
+    }
+  };
+
 
   return (
     <>
@@ -629,6 +638,20 @@ export default function ChatInterface() {
             </SidebarMenu>
           </div>
         </ScrollArea>
+        <SidebarFooter>
+          <SidebarMenu>
+            <SidebarMenuItem>
+                <SidebarMenuButton
+                    onClick={handleProfileClick}
+                    className="w-full text-left justify-start group-data-[collapsible=icon]:justify-center"
+                    tooltip={{ children: "Meu Perfil", side: "right", align: "center" }}
+                >
+                    <User className="h-4 w-4 text-muted-foreground group-data-[collapsible=icon]:text-inherit" />
+                    <span className="truncate">Meu Perfil</span>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
       </Sidebar>
 
       <SidebarInset>
