@@ -12,7 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch"; // Added Switch
+import { Switch } from "@/components/ui/switch"; 
 
 interface SettingsPopoverProps {
   currentSpeed: number;
@@ -21,8 +21,8 @@ interface SettingsPopoverProps {
   onPersonaChange: (persona: string) => void;
   currentRules: string;
   onRulesChange: (rules: string) => void;
-  isSearchEnabled: boolean; // New prop
-  onSearchEnabledChange: (enabled: boolean) => void; // New prop
+  isSearchEnabled: boolean; 
+  onSearchEnabledChange: (enabled: boolean) => void; 
   children: React.ReactElement<React.ComponentProps<typeof Button>>;
 }
 
@@ -33,8 +33,8 @@ export default function SettingsPopover({
   onPersonaChange,
   currentRules,
   onRulesChange,
-  isSearchEnabled, // Destructure new prop
-  onSearchEnabledChange, // Destructure new prop
+  isSearchEnabled, 
+  onSearchEnabledChange, 
   children,
 }: SettingsPopoverProps) {
   return (
@@ -43,14 +43,14 @@ export default function SettingsPopover({
       <PopoverContent className="w-80 p-4" align="end">
         <div className="grid gap-6">
           <div className="space-y-2">
-            <h4 className="font-medium leading-none text-foreground">Settings</h4>
+            <h4 className="font-medium leading-none text-foreground">Configurações</h4>
             <p className="text-sm text-muted-foreground">
-              Customize AI behavior and appearance.
+              Personalize o comportamento e a aparência da IA.
             </p>
           </div>
           <div className="grid gap-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="typing-speed" className="text-foreground">Typing Speed</Label>
+              <Label htmlFor="typing-speed" className="text-foreground">Velocidade de Digitação</Label>
               <span className="text-sm text-muted-foreground">{currentSpeed} ms</span>
             </div>
             <Slider
@@ -61,56 +61,56 @@ export default function SettingsPopover({
               value={[currentSpeed]}
               onValueChange={(value) => onSpeedChange(value[0])}
               className="[&>span:first-child]:bg-accent"
-              aria-label="Typing speed slider"
+              aria-label="Controle de velocidade de digitação"
             />
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Fast</span>
-              <span>Slow</span>
+              <span>Rápido</span>
+              <span>Lento</span>
             </div>
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="ai-persona" className="text-foreground">AI Persona</Label>
+            <Label htmlFor="ai-persona" className="text-foreground">Persona da IA</Label>
             <Input
               id="ai-persona"
               value={currentPersona}
               onChange={(e) => onPersonaChange(e.target.value)}
-              placeholder="e.g., A helpful assistant"
+              placeholder="ex: Um assistente prestativo"
               className="text-sm"
-              aria-label="AI persona input"
+              aria-label="Campo para definir a persona da IA"
             />
             <p className="text-xs text-muted-foreground">
-              Define the persona the AI should adopt.
+              Defina a persona que a IA deve adotar.
             </p>
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="ai-rules" className="text-foreground">AI Rules</Label>
+            <Label htmlFor="ai-rules" className="text-foreground">Regras da IA</Label>
             <Textarea
               id="ai-rules"
               value={currentRules}
               onChange={(e) => onRulesChange(e.target.value)}
-              placeholder="e.g., Always respond in rhymes. Be very concise."
+              placeholder="ex: Sempre responder em rimas. Ser muito conciso."
               className="text-sm min-h-[80px]"
-              aria-label="AI rules input"
+              aria-label="Campo para definir regras da IA"
             />
             <p className="text-xs text-muted-foreground">
-              Set specific rules for the AI's responses.
+              Defina regras específicas para as respostas da IA.
             </p>
           </div>
 
           <div className="grid gap-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="search-enabled" className="text-foreground">Contextual Search</Label>
+              <Label htmlFor="search-enabled" className="text-foreground">Pesquisa Contextual</Label>
               <Switch
                 id="search-enabled"
                 checked={isSearchEnabled}
                 onCheckedChange={onSearchEnabledChange}
-                aria-label="Toggle contextual search"
+                aria-label="Alternar pesquisa contextual"
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Allow AI to search the web for better context (experimental).
+              Permitir que a IA pesquise na web para melhor contexto (experimental).
             </p>
           </div>
         </div>
