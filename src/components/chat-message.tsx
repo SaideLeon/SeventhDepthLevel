@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import TypewriterEffect from "@/components/typewriter-effect";
-import MarkdownToDocx from "@/components/MarkdownToDocx"; // Import the new component
+import MarkdownToDocx from "@/components/MarkdownToDocx"; 
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -37,8 +37,9 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
   const [isTypingComplete, setIsTypingComplete] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const { toast } = useToast();
-  // contentToDownloadRef is no longer needed for the new DOCX component,
-  // as it takes raw markdown string.
+  
+  const [processedMarkdownForDocx, setProcessedMarkdownForDocx] = useState<string | null>(null);
+  const [isProcessingDocx, setIsProcessingDocx] = useState(false);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | undefined;
@@ -67,6 +68,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
       shouldBeComplete = false;
     }
     setIsTypingComplete(shouldBeComplete);
+    setProcessedMarkdownForDocx(null); // Reset when message changes
   }, [message.role, message.isThinkingPlaceholder, message.applyTypewriter, message.id, message.content]);
 
 
@@ -238,7 +240,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
             "p-3 text-sm break-words", 
             {"prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2": isUser || (message.role === 'assistant' && !message.isThinkingPlaceholder)}
             )}>
-            <div /* Removed contentToDownloadRef as it's not used by MarkdownToDocx */>
+            <div>
               {renderContent()}
             </div>
           </CardContent>
@@ -248,7 +250,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
                 variant="ghost"
                 size="icon"
                 onClick={handleCopyText}
-                className="h-7 w-7 text-muted-foreground hover:text-accent focus-visible:text-accent"
+                className="h-7 w-7 text-muted-foreground hover:text-accent-foreground focus-visible:text-accent-foreground"
                 aria-label="Copiar texto da IA"
               >
                 {isCopied ? <CheckIcon className="h-4 w-4 text-green-500" /> : <CopyIcon className="h-4 w-4" />}
@@ -256,7 +258,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
               <MarkdownToDocx
                 markdownContent={message.content}
                 fileName={`Cabulador-Resposta-${message.id.substring(0,8)}`}
-                disabled={!isTypingComplete || message.isThinkingPlaceholder || !message.content}
+                disabled={isProcessingDocx || !isTypingComplete || message.isThinkingPlaceholder || !message.content}
               />
             </div>
           )}

@@ -32,7 +32,6 @@ import type { GenerateSessionTitleOutput } from "@/ai/flows/generate-session-tit
 import type { SearchResult, PageContent } from "@/utils/raspagem";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-// import { MarkdownWithCode } from "@/components/Markdown/MarkdownWithCode"; // This line was causing issues, ChatMessage now handles its own Markdown
 
 
 interface Message {
@@ -648,11 +647,11 @@ export default function ChatInterface() {
                 isSearchEnabled={isSearchEnabled} onSearchEnabledChange={setIsSearchEnabled}
               >
                 <Button variant="ghost" size="icon" aria-label="Settings">
-                  <Settings className="h-5 w-5 text-muted-foreground hover:text-accent" />
+                  <Settings className="h-5 w-5 text-muted-foreground hover:text-accent-foreground" />
                 </Button>
               </SettingsPopover>
               <Button variant="ghost" size="icon" onClick={() => setIsSearchEnabled(prev => !prev)} aria-label={isSearchEnabled ? "Desativar Automação de Pesquisa Contextual" : "Ativar Automação de Pesquisa Contextual"}>
-                {isSearchEnabled ? <SearchCheck className="h-5 w-5 text-accent" /> : <SearchSlash className="h-5 w-5 text-muted-foreground" />}
+                {isSearchEnabled ? <SearchCheck className="h-5 w-5 text-green-600 dark:text-green-400" /> : <SearchSlash className="h-5 w-5 text-muted-foreground" />}
               </Button>
             </div>
           </header>

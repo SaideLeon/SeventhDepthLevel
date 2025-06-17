@@ -78,7 +78,7 @@ export default function MarkdownToDocx({ markdownContent, fileName = "documento_
       disabled={!markdownContent || isConverting || disabled}
       variant="ghost" 
       size="icon"    
-      className="h-7 w-7 text-muted-foreground hover:text-accent focus-visible:text-accent" 
+      className="h-7 w-7 text-muted-foreground hover:text-accent-foreground focus-visible:text-accent-foreground" 
       aria-label="Baixar como DOCX"
     >
       {isConverting ? (
