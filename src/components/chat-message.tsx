@@ -3,11 +3,12 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { User, Bot, Loader2, Copy as CopyIcon, Check as CheckIcon, Download } from "lucide-react";
+import { User, Bot, Loader2, Copy as CopyIcon, Check as CheckIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import TypewriterEffect from "@/components/typewriter-effect";
+import MarkdownToDocx from "@/components/MarkdownToDocx"; // Import the new component
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -36,7 +37,8 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
   const [isTypingComplete, setIsTypingComplete] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const { toast } = useToast();
-  const contentToDownloadRef = useRef<HTMLDivElement>(null);
+  // contentToDownloadRef is no longer needed for the new DOCX component,
+  // as it takes raw markdown string.
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | undefined;
@@ -96,61 +98,6 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
       });
     }
   };
-
-  const handleDownloadDoc = async () => {
-    const elementToCapture = contentToDownloadRef.current;
-    if (!elementToCapture || !message.content) {
-      toast({ title: "Erro ao Baixar Documento", description: "Nenhum conteúdo para baixar.", variant: "destructive" });
-      return;
-    }
-
-    toast({ title: "Preparando Documento...", description: "Aguarde enquanto o arquivo .doc é gerado." });
-
-    try {
-      // Get the inner HTML of the content
-      const contentHtml = elementToCapture.innerHTML;
-
-      // Construct a full HTML document string
-      // Basic styling is included to suggest a white background and black text.
-      // Word will interpret this.
-      const fullHtml = `
-        <!DOCTYPE html>
-        <html lang="pt">
-        <head>
-          <meta charset="UTF-8">
-          <title>Cabulador Resposta</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 20px; background-color: #ffffff; color: #000000; }
-            /* Add any other specific styles for prose content if needed directly here */
-            /* For example, for code blocks (though Word's HTML import handles <pre> and <code> reasonably) */
-            pre { background-color: #f0f0f0; padding: 10px; border-radius: 5px; overflow-x: auto; }
-            code { font-family: monospace; }
-            img { max-width: 100%; height: auto; display: block; margin-top: 10px; margin-bottom: 10px; }
-          </style>
-        </head>
-        <body>
-          ${contentHtml}
-        </body>
-        </html>
-      `;
-
-      const blob = new Blob([fullHtml], { type: 'application/msword' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `Cabulador-Resposta-${message.id.substring(0,6)}.doc`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(link.href);
-
-      toast({ title: "Download Iniciado", description: "Seu arquivo .doc está sendo baixado." });
-
-    } catch (error) {
-      console.error("Erro ao gerar .doc:", error);
-      toast({ title: "Erro ao Baixar Documento", description: "Não foi possível gerar o arquivo .doc. Tente novamente.", variant: "destructive" });
-    }
-  };
-
 
   const markdownComponents = {
     pre: ({ node, children, ...props }: any) => {
@@ -291,12 +238,12 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
             "p-3 text-sm break-words", 
             {"prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2": isUser || (message.role === 'assistant' && !message.isThinkingPlaceholder)}
             )}>
-            <div ref={contentToDownloadRef}>
+            <div /* Removed contentToDownloadRef as it's not used by MarkdownToDocx */>
               {renderContent()}
             </div>
           </CardContent>
           {!isUser && isTypingComplete && !message.isThinkingPlaceholder && message.content && (
-            <div className="absolute top-1 right-1 flex space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
+            <div className="absolute top-1 right-1 flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
               <Button
                 variant="ghost"
                 size="icon"
@@ -306,15 +253,11 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
               >
                 {isCopied ? <CheckIcon className="h-4 w-4 text-green-500" /> : <CopyIcon className="h-4 w-4" />}
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleDownloadDoc}
-                className="h-7 w-7 text-muted-foreground hover:text-accent focus-visible:text-accent"
-                aria-label="Baixar resposta como .doc"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
+              <MarkdownToDocx
+                markdownContent={message.content}
+                fileName={`Cabulador-Resposta-${message.id.substring(0,8)}`}
+                disabled={!isTypingComplete || message.isThinkingPlaceholder || !message.content}
+              />
             </div>
           )}
         </Card>
