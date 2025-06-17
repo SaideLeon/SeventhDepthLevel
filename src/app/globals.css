@@ -17,8 +17,8 @@
     --secondary-foreground: 0 0% 9%;
     --muted: 0 0% 90%;
     --muted-foreground: 0 0% 45.1%;
-    --accent: 140 40% 70%; /* Softer, lighter green */
-    --accent-foreground: 0 0% 10%; /* Dark text for light accent */
+    --accent: 200 60% 92%; /* Very light, soft blue/gray for hover background */
+    --accent-foreground: 200 70% 45%; /* Medium-dark, clear blue for hover text */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 89.8%;
@@ -52,8 +52,8 @@
     --secondary-foreground: 0 0% 94%;
     --muted: 0 0% 24%; /* #3D3D3D */
     --muted-foreground: 0 0% 60%; /* Adjusted for readability */
-    --accent: 140 40% 60%; /* Softer, lighter green for Dark Mode */
-    --accent-foreground: 0 0% 98%; /* Light text for dark accent */
+    --accent: 205 35% 18%; /* Dark, subtle blue/teal for hover background */
+    --accent-foreground: 195 75% 65%; /* Bright cyan/blue for hover text */
     --destructive: 0 70% 55%; /* Brighter red for visibility #FF4D4D */
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 22%; /* #383838 */
@@ -124,3 +124,4 @@
   }
 
 }
+
