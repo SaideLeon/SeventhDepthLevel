@@ -257,7 +257,7 @@ export default function ChatMessage({ message, typingSpeed }: ChatMessageProps) 
               </Button>
               <MarkdownToDocx
                 markdownContent={message.content}
-                fileName={`Cabulador-Resposta-${message.id.substring(0,8)}`}
+                fileName={`Cognick-Resposta-${message.id.substring(0,8)}`}
                 disabled={isProcessingDocx || !isTypingComplete || message.isThinkingPlaceholder || !message.content}
               />
             </div>

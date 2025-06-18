@@ -1,5 +1,5 @@
-# Firebase Studio
+# Cognick - Your AI Study Assistant
 
-This is a NextJS starter in Firebase Studio.
+Cognick is a NextJS application designed to be your AI-powered study assistant.
 
 To get started, take a look at src/app/page.tsx.

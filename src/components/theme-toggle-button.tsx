@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const THEME_STORAGE_KEY = "typewriterai_theme";
+const THEME_STORAGE_KEY = "cognick_theme";
 
 export default function ThemeToggleButton() {
   // Default theme for initial render and server-side.

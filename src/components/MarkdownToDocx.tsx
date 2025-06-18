@@ -13,7 +13,7 @@ interface MarkdownToDocxProps {
   disabled?: boolean;
 }
 
-export default function MarkdownToDocx({ markdownContent, fileName = "documento_cabulador_ai", disabled = false }: MarkdownToDocxProps) {
+export default function MarkdownToDocx({ markdownContent, fileName = "documento_cognick_ai", disabled = false }: MarkdownToDocxProps) {
   const { toast } = useToast();
   const [isConverting, setIsConverting] = React.useState(false);
 

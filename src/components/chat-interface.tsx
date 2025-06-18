@@ -17,7 +17,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarFooter, // Added SidebarFooter
+  SidebarFooter,
   SidebarInset,
   SidebarTrigger,
   useSidebar,
@@ -55,12 +55,12 @@ interface ChatSession {
   hasAiGeneratedTitle?: boolean;
 }
 
-const TYPING_SPEED_STORAGE_KEY = "cabulador_typing_speed";
-const AI_PERSONA_STORAGE_KEY = "cabulador_persona";
-const AI_RULES_STORAGE_KEY = "cabulador_rules";
-const SEARCH_ENABLED_STORAGE_KEY = "cabulador_search_enabled";
-const SESSIONS_STORAGE_KEY = "cabulador_sessions";
-const ACTIVE_SESSION_ID_STORAGE_KEY = "cabulador_active_session_id";
+const TYPING_SPEED_STORAGE_KEY = "cognick_typing_speed";
+const AI_PERSONA_STORAGE_KEY = "cognick_persona";
+const AI_RULES_STORAGE_KEY = "cognick_rules";
+const SEARCH_ENABLED_STORAGE_KEY = "cognick_search_enabled";
+const SESSIONS_STORAGE_KEY = "cognick_sessions";
+const ACTIVE_SESSION_ID_STORAGE_KEY = "cognick_active_session_id";
 
 const SUGGESTION_PROMPTS = [
   "O que é fotossíntese?",
@@ -659,7 +659,7 @@ export default function ChatInterface() {
           <header className="p-2 border-b flex justify-between items-center shadow-sm sticky top-0 bg-background z-10">
             <div className="flex items-center gap-1">
                  <SidebarTrigger className="md:hidden" />
-                 <h1 className="text-xl md:text-2xl font-headline font-semibold text-primary">Cabulador</h1>
+                 <h1 className="text-xl md:text-2xl font-headline font-semibold text-primary">Cognick</h1>
             </div>
             <div className="flex items-center gap-2">
               <ThemeToggleButton />
@@ -744,4 +744,3 @@ export default function ChatInterface() {
     </>
   );
 }
-    
