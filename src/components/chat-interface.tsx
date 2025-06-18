@@ -34,6 +34,7 @@ import type { GenerateSessionTitleOutput } from "@/ai/flows/generate-session-tit
 import type { SearchResult, PageContent } from "@/utils/raspagem";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import type { FichaLeitura } from "@/ai/flows/generate-fichamento-flow";
 
 
 interface Message {
@@ -56,13 +57,12 @@ interface ChatSession {
   hasAiGeneratedTitle?: boolean;
 }
 
-// Types for Academic Work
-export interface AcademicWorkSection { // Exporting for use in AcademicWorkCreator
+export interface AcademicWorkSection {
   title: string;
-  content: string; // Markdown content for the section
+  content: string;
 }
 
-export interface AcademicWork { // Exporting for use in AcademicWorkCreator
+export interface AcademicWork {
   id: string;
   theme: string; 
   title: string; 
@@ -70,6 +70,11 @@ export interface AcademicWork { // Exporting for use in AcademicWorkCreator
   fullGeneratedText?: string; 
   createdAt: number;
   lastUpdatedAt: number;
+  fichas?: FichaLeitura[];
+  generatedIndex?: string[];
+  researchLog?: string[];
+  writingLog?: string[];
+  detectedTopic?: string | null;
 }
 
 
@@ -130,7 +135,6 @@ export default function ChatInterface() {
   // Save app mode
   useEffect(() => {
     localStorage.setItem(APP_MODE_STORAGE_KEY, appMode);
-     // When mode changes, if no active item in new mode, try to load one or create new
     if (appMode === 'chat' && !activeSessionId && sessions.length > 0) {
       setActiveSessionId(sessions[0].id);
     } else if (appMode === 'chat' && !activeSessionId && sessions.length === 0) {
@@ -180,17 +184,35 @@ export default function ChatInterface() {
 
   const handleStartNewAcademicWorkItem = useCallback(() => {
     const newWorkId = Date.now().toString();
-    const defaultTheme = `Novo Trabalho Acadêmico (${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short'})})`;
-    const theme = prompt("Digite o tema principal do seu trabalho acadêmico:", defaultTheme) || defaultTheme;
+    const userInputTheme = prompt("Digite o tema principal do seu trabalho acadêmico:", "Novo Trabalho Acadêmico");
+    
+    let workTitle: string;
+    let workTheme: string;
+
+    if (userInputTheme === null) { // User cancelled the prompt
+        workTitle = `Novo Trabalho (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`;
+        workTheme = ""; 
+    } else if (userInputTheme.trim() === "") { // User entered nothing or only spaces
+        workTitle = "Novo Trabalho Acadêmico";
+        workTheme = "";
+    } else {
+        workTitle = userInputTheme;
+        workTheme = userInputTheme;
+    }
     
     const newWork: AcademicWork = {
       id: newWorkId,
-      theme: theme,
-      title: theme, // Initially same as theme
+      theme: workTheme,
+      title: workTitle,
       sections: [],
       fullGeneratedText: "",
       createdAt: Date.now(),
       lastUpdatedAt: Date.now(),
+      fichas: [],
+      generatedIndex: [],
+      researchLog: [],
+      writingLog: [],
+      detectedTopic: null,
     };
     setAcademicWorks(prev => [newWork, ...prev.sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt)]);
     setActiveAcademicWorkId(newWorkId);
@@ -220,7 +242,7 @@ export default function ChatInterface() {
       setActiveSessionId(storedActiveId);
     } else if (loadedSessions.length > 0 && appMode === 'chat') {
       setActiveSessionId(loadedSessions[0].id);
-    } else if (appMode === 'chat' && loadedSessions.length === 0) { // Ensure a session exists if mode is chat
+    } else if (appMode === 'chat' && loadedSessions.length === 0) { 
       handleStartNewChatItem();
     }
   }, [appMode, handleStartNewChatItem]);
@@ -242,7 +264,7 @@ export default function ChatInterface() {
         setActiveAcademicWorkId(storedActiveWorkId);
     } else if (loadedWorks.length > 0 && appMode === 'academic') {
         setActiveAcademicWorkId(loadedWorks[0].id);
-    } else if (appMode === 'academic' && loadedWorks.length === 0) { // Ensure a work item exists if mode is academic
+    } else if (appMode === 'academic' && loadedWorks.length === 0) { 
         handleStartNewAcademicWorkItem();
     }
   }, [appMode, handleStartNewAcademicWorkItem]);
@@ -674,7 +696,6 @@ export default function ChatInterface() {
     }
   };
 
-  // Update academic work (e.g., when a section is generated)
   const updateAcademicWork = (updatedWork: AcademicWork) => {
     setAcademicWorks(prevWorks =>
       prevWorks.map(work =>
@@ -880,5 +901,3 @@ export default function ChatInterface() {
     </>
   );
 }
-
-    
