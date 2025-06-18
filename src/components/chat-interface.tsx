@@ -11,7 +11,7 @@ import { SendHorizontal, Loader2, PlusCircle, Settings, SearchCheck, SearchSlash
 import ChatMessage from "@/components/chat-message";
 import SettingsPopover from "@/components/settings-popover";
 import ThemeToggleButton from "./theme-toggle-button";
-import AcademicWorkCreator from "./academic-work-creator"; // New component
+import AcademicWorkCreator from "./academic-work-creator";
 import {
   Sidebar,
   SidebarHeader,
@@ -57,17 +57,17 @@ interface ChatSession {
 }
 
 // Types for Academic Work
-interface AcademicWorkSection {
+export interface AcademicWorkSection { // Exporting for use in AcademicWorkCreator
   title: string;
   content: string; // Markdown content for the section
 }
 
-interface AcademicWork {
+export interface AcademicWork { // Exporting for use in AcademicWorkCreator
   id: string;
-  theme: string; // Overall theme/topic provided by user, used as a base for title
-  title: string; // User-editable title, initially based on theme
+  theme: string; 
+  title: string; 
   sections: AcademicWorkSection[];
-  fullGeneratedText?: string; // Stores the complete assembled Markdown for download
+  fullGeneratedText?: string; 
   createdAt: number;
   lastUpdatedAt: number;
 }
@@ -130,7 +130,17 @@ export default function ChatInterface() {
   // Save app mode
   useEffect(() => {
     localStorage.setItem(APP_MODE_STORAGE_KEY, appMode);
-  }, [appMode]);
+     // When mode changes, if no active item in new mode, try to load one or create new
+    if (appMode === 'chat' && !activeSessionId && sessions.length > 0) {
+      setActiveSessionId(sessions[0].id);
+    } else if (appMode === 'chat' && !activeSessionId && sessions.length === 0) {
+      handleStartNewChatItem();
+    } else if (appMode === 'academic' && !activeAcademicWorkId && academicWorks.length > 0) {
+      setActiveAcademicWorkId(academicWorks[0].id);
+    } else if (appMode === 'academic' && !activeAcademicWorkId && academicWorks.length === 0) {
+      handleStartNewAcademicWorkItem();
+    }
+  }, [appMode, activeSessionId, activeAcademicWorkId, sessions, academicWorks ]);
 
 
   useEffect(() => {
@@ -170,13 +180,15 @@ export default function ChatInterface() {
 
   const handleStartNewAcademicWorkItem = useCallback(() => {
     const newWorkId = Date.now().toString();
-    // Prompt user for the initial theme/title, or use a default
-    const theme = prompt("Digite o tema principal do seu trabalho acadêmico:", "Novo Trabalho Acadêmico") || `Trabalho ${newWorkId.slice(-4)}`;
+    const defaultTheme = `Novo Trabalho Acadêmico (${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short'})})`;
+    const theme = prompt("Digite o tema principal do seu trabalho acadêmico:", defaultTheme) || defaultTheme;
+    
     const newWork: AcademicWork = {
       id: newWorkId,
       theme: theme,
       title: theme, // Initially same as theme
       sections: [],
+      fullGeneratedText: "",
       createdAt: Date.now(),
       lastUpdatedAt: Date.now(),
     };
@@ -208,7 +220,7 @@ export default function ChatInterface() {
       setActiveSessionId(storedActiveId);
     } else if (loadedSessions.length > 0 && appMode === 'chat') {
       setActiveSessionId(loadedSessions[0].id);
-    } else if (appMode === 'chat') {
+    } else if (appMode === 'chat' && loadedSessions.length === 0) { // Ensure a session exists if mode is chat
       handleStartNewChatItem();
     }
   }, [appMode, handleStartNewChatItem]);
@@ -230,14 +242,14 @@ export default function ChatInterface() {
         setActiveAcademicWorkId(storedActiveWorkId);
     } else if (loadedWorks.length > 0 && appMode === 'academic') {
         setActiveAcademicWorkId(loadedWorks[0].id);
-    } else if (appMode === 'academic') {
+    } else if (appMode === 'academic' && loadedWorks.length === 0) { // Ensure a work item exists if mode is academic
         handleStartNewAcademicWorkItem();
     }
   }, [appMode, handleStartNewAcademicWorkItem]);
 
 
   useEffect(() => {
-    if (sessions.length > 0 || localStorage.getItem(SESSIONS_STORAGE_KEY)) { // Save even if empty to clear old data
+    if (sessions.length > 0 || localStorage.getItem(SESSIONS_STORAGE_KEY)) { 
         localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
     }
   }, [sessions]);
@@ -546,7 +558,7 @@ export default function ChatInterface() {
                 if (!contentApiResponse.ok) { console.warn(`Falha ao buscar conteúdo para ${article.url}`); continue; }
                 const pageContent: PageContent = await contentApiResponse.json();
                 if (pageContent.conteudo && !pageContent.erro) {
-                  aggregatedContext.push(`Fonte ${i + 1}: ${pageContent.titulo}\nAutor: ${pageContent.autor || 'N/A'}\nConteúdo:\n${pageContent.conteudo.substring(0, 10000)}...`);
+                  aggregatedContext.push(`Fonte ${i + 1}: ${pageContent.titulo}\nAutor: ${pageContent.autor || 'N/A'}\nData: ${pageContent.dataPublicacao || 'N/A'}\nConteúdo:\n${pageContent.conteudo.substring(0, 10000)}...`);
                   if (pageContent.imagens && pageContent.imagens.length > 0) aggregatedImageInfo.push(pageContent.imagens.map(img => `${img.legenda || pageContent.titulo || 'Imagem'} (${img.src})`).join('; '));
                 }
               }
@@ -646,7 +658,8 @@ export default function ChatInterface() {
 
   const disableNewItemButton = appMode === 'chat'
     ? (!!activeSession && activeSession.messages.length === 0 && !inputValue.trim() && !selectedImageFile)
-    : (!!activeAcademicWork && activeAcademicWork.sections.length === 0); // Potentially add more conditions for academic mode
+    : (!!activeAcademicWork && activeAcademicWork.sections.length === 0 && !activeAcademicWork.fullGeneratedText);
+
 
   const handleProfileClick = () => {
     toast({ title: "Perfil do Usuário", description: "Funcionalidade de perfil ainda não implementada." });
@@ -703,7 +716,7 @@ export default function ChatInterface() {
             variant="outline"
             className="w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2"
             onClick={handleNewItem}
-            disabled={disableNewItemButton && (appMode === 'chat' && !inputValue && !selectedImageFile)}
+            disabled={isLoading || (appMode === 'chat' ? disableNewItemButton : (!!activeAcademicWork && !activeAcademicWork.fullGeneratedText && activeAcademicWork.sections.length > 0)) }
             title={disableNewItemButton ? (appMode === 'chat' ? "Envie uma mensagem para iniciar um novo chat." : "Complete o trabalho atual para iniciar um novo.") : (appMode === 'chat' ? "Iniciar novo chat" : "Iniciar novo trabalho")}
           >
             <PlusCircle className="h-4 w-4" />
@@ -785,7 +798,7 @@ export default function ChatInterface() {
               </SettingsPopover>
               {appMode === 'chat' && (
                 <Button variant="ghost" size="icon" onClick={() => setIsSearchEnabled(prev => !prev)} aria-label={isSearchEnabled ? "Desativar Automação de Pesquisa Contextual" : "Ativar Automação de Pesquisa Contextual"}>
-                    {isSearchEnabled ? <SearchCheck className="h-5 w-5 text-green-600 dark:text-green-400" /> : <SearchSlash className="h-5 w-5 text-muted-foreground" />}
+                    {isSearchEnabled ? <SearchCheck className="h-5 w-5 text-green-600 dark:text-green-400" /> : <SearchSlash className="h-5 w-5 text-muted-foreground hover:text-accent-foreground" />}
                 </Button>
               )}
             </div>
@@ -805,7 +818,7 @@ export default function ChatInterface() {
                           <Button
                             key={index}
                             variant="outline"
-                            className="p-3 h-auto text-sm text-left justify-start leading-snug whitespace-normal hover:bg-accent/10 dark:hover:bg-accent/20"
+                            className="p-3 h-auto text-sm text-left justify-start leading-snug whitespace-normal hover:bg-accent hover:text-accent-foreground"
                             onClick={() => handleSuggestionClick(suggestion)}
                             disabled={isLoading}
                           >
