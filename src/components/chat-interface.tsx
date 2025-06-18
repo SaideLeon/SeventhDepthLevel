@@ -7,10 +7,11 @@ import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { SendHorizontal, Loader2, PlusCircle, Settings, SearchCheck, SearchSlash, Paperclip, X, MessageSquareText, Sparkles, User } from "lucide-react";
+import { SendHorizontal, Loader2, PlusCircle, Settings, SearchCheck, SearchSlash, Paperclip, X, MessageSquareText, Sparkles, User, BookMarked, FileText } from "lucide-react";
 import ChatMessage from "@/components/chat-message";
 import SettingsPopover from "@/components/settings-popover";
 import ThemeToggleButton from "./theme-toggle-button";
+import AcademicWorkCreator from "./academic-work-creator"; // New component
 import {
   Sidebar,
   SidebarHeader,
@@ -55,12 +56,35 @@ interface ChatSession {
   hasAiGeneratedTitle?: boolean;
 }
 
+// Types for Academic Work
+interface AcademicWorkSection {
+  title: string;
+  content: string; // Markdown content for the section
+}
+
+interface AcademicWork {
+  id: string;
+  theme: string; // Overall theme/topic provided by user, used as a base for title
+  title: string; // User-editable title, initially based on theme
+  sections: AcademicWorkSection[];
+  fullGeneratedText?: string; // Stores the complete assembled Markdown for download
+  createdAt: number;
+  lastUpdatedAt: number;
+}
+
+
 const TYPING_SPEED_STORAGE_KEY = "cognick_typing_speed";
 const AI_PERSONA_STORAGE_KEY = "cognick_persona";
 const AI_RULES_STORAGE_KEY = "cognick_rules";
 const SEARCH_ENABLED_STORAGE_KEY = "cognick_search_enabled";
+
 const SESSIONS_STORAGE_KEY = "cognick_sessions";
 const ACTIVE_SESSION_ID_STORAGE_KEY = "cognick_active_session_id";
+
+const ACADEMIC_WORKS_STORAGE_KEY = "cognick_academic_works";
+const ACTIVE_ACADEMIC_WORK_ID_STORAGE_KEY = "cognick_active_academic_work_id";
+const APP_MODE_STORAGE_KEY = "cognick_app_mode";
+
 
 const SUGGESTION_PROMPTS = [
   "O que é fotossíntese?",
@@ -69,10 +93,18 @@ const SUGGESTION_PROMPTS = [
   "Quais foram as principais causas da Primeira Guerra Mundial?"
 ];
 
+type AppMode = 'chat' | 'academic';
+
 
 export default function ChatInterface() {
+  const [appMode, setAppMode] = useState<AppMode>('chat');
+
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+
+  const [academicWorks, setAcademicWorks] = useState<AcademicWork[]>([]);
+  const [activeAcademicWorkId, setActiveAcademicWorkId] = useState<string | null>(null);
+
   const [inputValue, setInputValue] = useState<string>("");
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
@@ -87,6 +119,19 @@ export default function ChatInterface() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { isMobile, setOpenMobile } = useSidebar();
+
+
+  // Load app mode
+  useEffect(() => {
+    const storedMode = localStorage.getItem(APP_MODE_STORAGE_KEY) as AppMode | null;
+    if (storedMode) setAppMode(storedMode);
+  }, []);
+
+  // Save app mode
+  useEffect(() => {
+    localStorage.setItem(APP_MODE_STORAGE_KEY, appMode);
+  }, [appMode]);
+
 
   useEffect(() => {
     const storedSpeed = localStorage.getItem(TYPING_SPEED_STORAGE_KEY);
@@ -104,11 +149,12 @@ export default function ChatInterface() {
   useEffect(() => { localStorage.setItem(AI_RULES_STORAGE_KEY, aiRules); }, [aiRules]);
   useEffect(() => { localStorage.setItem(SEARCH_ENABLED_STORAGE_KEY, String(isSearchEnabled)); }, [isSearchEnabled]);
 
-  const handleStartNewChat = useCallback(() => {
+
+  const handleStartNewChatItem = useCallback(() => {
     const newSessionId = Date.now().toString();
     const newSession: ChatSession = {
       id: newSessionId,
-      title: `Nova Conversa (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
+      title: `Novo Chat (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
       messages: [],
       createdAt: Date.now(),
       lastUpdatedAt: Date.now(),
@@ -118,8 +164,28 @@ export default function ChatInterface() {
     setActiveSessionId(newSessionId);
     setInputValue("");
     clearSelectedImage();
+    if (isMobile) setOpenMobile(false);
     return newSessionId;
-  }, []);
+  }, [isMobile, setOpenMobile]);
+
+  const handleStartNewAcademicWorkItem = useCallback(() => {
+    const newWorkId = Date.now().toString();
+    // Prompt user for the initial theme/title, or use a default
+    const theme = prompt("Digite o tema principal do seu trabalho acadêmico:", "Novo Trabalho Acadêmico") || `Trabalho ${newWorkId.slice(-4)}`;
+    const newWork: AcademicWork = {
+      id: newWorkId,
+      theme: theme,
+      title: theme, // Initially same as theme
+      sections: [],
+      createdAt: Date.now(),
+      lastUpdatedAt: Date.now(),
+    };
+    setAcademicWorks(prev => [newWork, ...prev.sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt)]);
+    setActiveAcademicWorkId(newWorkId);
+    if (isMobile) setOpenMobile(false);
+    return newWorkId;
+  }, [isMobile, setOpenMobile]);
+
 
    useEffect(() => {
     const storedSessions = localStorage.getItem(SESSIONS_STORAGE_KEY);
@@ -129,55 +195,77 @@ export default function ChatInterface() {
     if (storedSessions) {
       try {
         loadedSessions = JSON.parse(storedSessions);
-        // Ensure applyTypewriter is false for all loaded messages
         loadedSessions = loadedSessions.map(s => ({
             ...s,
-            hasAiGeneratedTitle: s.hasAiGeneratedTitle || false, // Ensure this field exists
-            messages: s.messages.map(m => ({
-                ...m,
-                applyTypewriter: false
-            }))
+            hasAiGeneratedTitle: s.hasAiGeneratedTitle || false,
+            messages: s.messages.map(m => ({ ...m, applyTypewriter: false }))
         }));
-      } catch (e) {
-        console.error("Failed to parse sessions from localStorage", e);
-        loadedSessions = []; // Reset to empty if parsing fails
-      }
+      } catch (e) { console.error("Falha ao carregar sessões do chat:", e); loadedSessions = []; }
     }
-
     setSessions(loadedSessions.sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt));
 
     if (storedActiveId && loadedSessions.some(s => s.id === storedActiveId)) {
       setActiveSessionId(storedActiveId);
-    } else if (loadedSessions.length > 0) {
-      setActiveSessionId(loadedSessions[0].id); // Default to the most recently updated session
-    } else {
-      // If no sessions, or if activeId is invalid, start a new chat
-      handleStartNewChat();
+    } else if (loadedSessions.length > 0 && appMode === 'chat') {
+      setActiveSessionId(loadedSessions[0].id);
+    } else if (appMode === 'chat') {
+      handleStartNewChatItem();
     }
-  }, [handleStartNewChat]); // handleStartNewChat is now a dependency
+  }, [appMode, handleStartNewChatItem]);
 
 
   useEffect(() => {
-    if (sessions.length > 0) {
+    const storedWorks = localStorage.getItem(ACADEMIC_WORKS_STORAGE_KEY);
+    const storedActiveWorkId = localStorage.getItem(ACTIVE_ACADEMIC_WORK_ID_STORAGE_KEY);
+    let loadedWorks: AcademicWork[] = [];
+
+    if (storedWorks) {
+        try {
+            loadedWorks = JSON.parse(storedWorks);
+        } catch (e) { console.error("Falha ao carregar trabalhos acadêmicos:", e); loadedWorks = []; }
+    }
+    setAcademicWorks(loadedWorks.sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt));
+
+    if (storedActiveWorkId && loadedWorks.some(w => w.id === storedActiveWorkId)) {
+        setActiveAcademicWorkId(storedActiveWorkId);
+    } else if (loadedWorks.length > 0 && appMode === 'academic') {
+        setActiveAcademicWorkId(loadedWorks[0].id);
+    } else if (appMode === 'academic') {
+        handleStartNewAcademicWorkItem();
+    }
+  }, [appMode, handleStartNewAcademicWorkItem]);
+
+
+  useEffect(() => {
+    if (sessions.length > 0 || localStorage.getItem(SESSIONS_STORAGE_KEY)) { // Save even if empty to clear old data
         localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
     }
   }, [sessions]);
 
   useEffect(() => {
-    if (activeSessionId) {
-      localStorage.setItem(ACTIVE_SESSION_ID_STORAGE_KEY, activeSessionId);
-    }
+    if (activeSessionId) localStorage.setItem(ACTIVE_SESSION_ID_STORAGE_KEY, activeSessionId);
   }, [activeSessionId]);
+
+  useEffect(() => {
+    if (academicWorks.length > 0 || localStorage.getItem(ACADEMIC_WORKS_STORAGE_KEY)) {
+        localStorage.setItem(ACADEMIC_WORKS_STORAGE_KEY, JSON.stringify(academicWorks));
+    }
+  }, [academicWorks]);
+
+  useEffect(() => {
+    if (activeAcademicWorkId) localStorage.setItem(ACTIVE_ACADEMIC_WORK_ID_STORAGE_KEY, activeAcademicWorkId);
+  }, [activeAcademicWorkId]);
 
 
   useEffect(() => {
-    if (chatContainerRef.current) {
+    if (appMode === 'chat' && chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, [sessions, activeSessionId]); // Depends on currentMessages derived from sessions & activeSessionId
+  }, [sessions, activeSessionId, appMode]);
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
   const currentMessages = activeSession?.messages || [];
+  const activeAcademicWork = academicWorks.find(w => w.id === activeAcademicWorkId);
 
 
   const updateSessionMessages = (sessionId: string, newMessages: Message[], thinkingMessageIdToRemove?: string) => {
@@ -255,7 +343,6 @@ export default function ChatInterface() {
 
     if (sessionForTitleUpdate && !sessionForTitleUpdate.hasAiGeneratedTitle) {
         const userFirstMessageForTitle = sessionForTitleUpdate.messages.find(m => m.role === 'user');
-        // Ensure firstAIMessageForTitle is the one we just updated
         const firstAIMessageForTitle = sessionForTitleUpdate.messages.find(m => m.id === thinkingMessageId && m.role === 'assistant');
 
         if (userFirstMessageForTitle && firstAIMessageForTitle && firstAIMessageForTitle.content) {
@@ -266,7 +353,6 @@ export default function ChatInterface() {
                     body: JSON.stringify({
                         userFirstMessageContent: userFirstMessageForTitle.content,
                         aiFirstResponseContent: firstAIMessageForTitle.content,
-                        // targetLanguage could be added here if needed
                     }),
                 });
 
@@ -277,23 +363,16 @@ export default function ChatInterface() {
                         setSessions(prev =>
                             prev.map(s =>
                                 s.id === sessionId
-                                    ? { ...s, title: titleResult.generatedTitle, hasAiGeneratedTitle: true, lastUpdatedAt: Date.now() } // Mark as AI generated
+                                    ? { ...s, title: titleResult.generatedTitle, hasAiGeneratedTitle: true, lastUpdatedAt: Date.now() }
                                     : s
                             ).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt)
                         );
                     } else if (titleResult.error) {
-                        // Log API-specific error, but don't crash UI
                         console.warn("API returned error for session title generation:", titleResult.error, titleResult.details);
                     }
                 } else {
-                    // Handle non-JSON or error responses
                     const errorText = await titleResponse.text();
-                    console.warn(
-                        "Failed to generate AI session title. Status:",
-                        titleResponse.status,
-                        "Content-Type:", contentType,
-                        "Response body:", errorText
-                    );
+                    console.warn( "Failed to generate AI session title. Status:", titleResponse.status, "Content-Type:", contentType, "Response body:", errorText );
                 }
             } catch (error) {
                 console.error("Error calling generate session title API or parsing its response:", error);
@@ -305,7 +384,7 @@ export default function ChatInterface() {
   const handleImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      if (file.size > 5 * 1024 * 1024) {
         toast({ title: "Imagem Muito Grande", description: "Por favor, selecione uma imagem menor que 5MB.", variant: "destructive" });
         return;
       }
@@ -323,7 +402,7 @@ export default function ChatInterface() {
   const clearSelectedImage = () => {
     setSelectedImageFile(null);
     setSelectedImagePreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const fileToDataUri = (file: File): Promise<string> =>
@@ -342,11 +421,8 @@ export default function ChatInterface() {
 
     let currentSessionId = activeSessionId;
     if (!currentSessionId || !sessions.find(s => s.id === currentSessionId)) {
-        // If no active session or invalid active session, start a new one
-        currentSessionId = handleStartNewChat();
+        currentSessionId = handleStartNewChatItem();
     }
-
-    // Double check currentSessionId after potentially starting a new one
     if (!currentSessionId) {
         toast({ title: "Erro", description: "Nenhuma sessão ativa. Por favor, inicie uma nova conversa.", variant: "destructive" });
         setIsLoading(false);
@@ -356,7 +432,6 @@ export default function ChatInterface() {
     setIsLoading(true);
     let userImageDataUri: string | undefined = undefined;
 
-    // Only process image if it's a direct user submission, not a suggestion click
     if (selectedImageFile && !promptTextOverride) {
       try {
         userImageDataUri = await fileToDataUri(selectedImageFile);
@@ -373,53 +448,47 @@ export default function ChatInterface() {
       role: "user",
       content: userMessageContent,
       imageDataUri: userImageDataUri,
-      applyTypewriter: false, // User messages don't need typewriter
+      applyTypewriter: false,
     };
     addMessageToSession(currentSessionId, userMessage);
 
-    // Update title temporarily if it's a new chat
     const sessionForTempTitle = sessions.find(s => s.id === currentSessionId);
-    if (sessionForTempTitle && !sessionForTempTitle.hasAiGeneratedTitle && sessionForTempTitle.title.startsWith("Nova Conversa")) {
+    if (sessionForTempTitle && !sessionForTempTitle.hasAiGeneratedTitle && sessionForTempTitle.title.startsWith("Novo Chat")) {
         if (userMessageContent) {
             const tempTitle = userMessageContent.substring(0, 30) + (userMessageContent.length > 30 ? "..." : "");
             setSessions(prev => prev.map(s => s.id === currentSessionId ? {...s, title: tempTitle, lastUpdatedAt: Date.now()} : s).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt));
         } else if (userImageDataUri) {
-            // If only image, use a generic title
-            setSessions(prev => prev.map(s => s.id === currentSessionId ? {...s, title: "Conversa com Imagem", lastUpdatedAt: Date.now()} : s).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt));
+            setSessions(prev => prev.map(s => s.id === currentSessionId ? {...s, title: "Chat com Imagem", lastUpdatedAt: Date.now()} : s).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt));
         }
     }
 
-
-    // Clear input and image *only if it's not a suggestion click*
     if (!promptTextOverride) {
         setInputValue("");
         clearSelectedImage();
     }
 
-
-    const assistantMessageId = (Date.now() + 1).toString(); // Ensure unique ID
+    const assistantMessageId = (Date.now() + 1).toString();
     const thinkingMessage: Message = {
       id: assistantMessageId,
       role: "assistant",
-      content: "", // Placeholder content, will be updated
+      content: "",
       isThinkingPlaceholder: true,
       startTime: Date.now(),
       currentProcessingStepMessage: "Analisando sua solicitação...",
-      applyTypewriter: false, // Placeholders don't type
+      applyTypewriter: false,
     };
     addMessageToSession(currentSessionId, thinkingMessage);
 
     let contextContent: string | undefined = undefined;
     let imageInfo: string | undefined = undefined;
-    let flowToUse: 'simple' | 'academic' = 'academic'; // Default to academic
+    let flowToUse: 'simple' | 'academic' = 'academic';
     let searchPerformedAndFoundContext = false;
 
     try {
       updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Determinando o tipo de resposta..." });
 
-      // 1. Detect Query Type
       let detectedQueryTypeResult: DetectQueryTypeOutput | null = null;
-      if (userMessageContent || userImageDataUri || isSearchEnabled) { // Check if there's anything to analyze or if search is on
+      if (userMessageContent || userImageDataUri || isSearchEnabled) {
           const queryTypeResponse = await fetch('/api/detect-query-type', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ currentUserQuery: userMessageContent, userImageProvided: !!userImageDataUri }),
@@ -431,23 +500,19 @@ export default function ChatInterface() {
           detectedQueryTypeResult = await queryTypeResponse.json();
       }
 
-      // Handle CODING_TECHNICAL query type by providing a canned response
       if (detectedQueryTypeResult && detectedQueryTypeResult.queryType === 'CODING_TECHNICAL') {
         const refusalMessage = "Olá! Sou uma IA focada em te ajudar com seus estudos e aprendizado escolar. Para tarefas de desenvolvimento de software, criação ou explicação de códigos, sugiro que você experimente ferramentas mais especializadas como o ChatGPT da OpenAI ou o Gemini do Google. Eles são excelentes para isso e poderão te ajudar melhor! 😊";
         await replaceThinkingWithMessageInSession(currentSessionId, assistantMessageId, refusalMessage);
         setIsLoading(false);
-        return; // Stop further processing
+        return;
       }
 
-
-      // Determine flow based on query type or search settings
       if (userImageDataUri || !isSearchEnabled || (detectedQueryTypeResult && (detectedQueryTypeResult.queryType === 'IMAGE_ANALYSIS' || detectedQueryTypeResult.queryType === 'GENERAL_CONVERSATION'))) {
         flowToUse = 'simple';
       } else {
         flowToUse = 'academic';
       }
 
-      // 2. Perform Search if Academic Flow and Search Enabled
       if (flowToUse === 'academic' && isSearchEnabled && userMessageContent) {
           updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Detectando o tópico para pesquisa..." });
           const topicResponse = await fetch('/api/detect-topic', {
@@ -462,11 +527,11 @@ export default function ChatInterface() {
             updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: `Pesquisando por: "${detectedTopic}"... (até 3 páginas)` });
             const searchApiResponse = await fetch('/api/raspagem', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ termoBusca: detectedTopic, todasPaginas: true }), // Fetch all pages (up to 3)
+              body: JSON.stringify({ termoBusca: detectedTopic, todasPaginas: true }),
             });
             if (!searchApiResponse.ok) throw new Error("Falha ao buscar artigos");
             const searchResults: SearchResult[] = await searchApiResponse.json();
-            const articlesToFetch = searchResults.slice(0, 3); // Limit to top 3 articles
+            const articlesToFetch = searchResults.slice(0, 3);
             let aggregatedContext: string[] = [];
             let aggregatedImageInfo: string[] = [];
 
@@ -481,7 +546,7 @@ export default function ChatInterface() {
                 if (!contentApiResponse.ok) { console.warn(`Falha ao buscar conteúdo para ${article.url}`); continue; }
                 const pageContent: PageContent = await contentApiResponse.json();
                 if (pageContent.conteudo && !pageContent.erro) {
-                  aggregatedContext.push(`Fonte ${i + 1}: ${pageContent.titulo}\nAutor: ${pageContent.autor || 'N/A'}\nConteúdo:\n${pageContent.conteudo.substring(0, 10000)}...`); // Limit context length
+                  aggregatedContext.push(`Fonte ${i + 1}: ${pageContent.titulo}\nAutor: ${pageContent.autor || 'N/A'}\nConteúdo:\n${pageContent.conteudo.substring(0, 10000)}...`);
                   if (pageContent.imagens && pageContent.imagens.length > 0) aggregatedImageInfo.push(pageContent.imagens.map(img => `${img.legenda || pageContent.titulo || 'Imagem'} (${img.src})`).join('; '));
                 }
               }
@@ -491,29 +556,26 @@ export default function ChatInterface() {
                 searchPerformedAndFoundContext = true;
               } else {
                  updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: `Nenhum conteúdo de artigo encontrado para "${detectedTopic}". Prosseguindo com conhecimento geral...` });
-                 await new Promise(resolve => setTimeout(resolve, 1500)); // Brief pause
+                 await new Promise(resolve => setTimeout(resolve, 1500));
               }
             } else {
                updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: `Nenhum artigo relevante encontrado para "${detectedTopic}". Prosseguindo com conhecimento geral...` });
-               await new Promise(resolve => setTimeout(resolve, 1500)); // Brief pause
+               await new Promise(resolve => setTimeout(resolve, 1500));
             }
           }
-      } else if (flowToUse === 'simple' && (!userMessageContent && userImageDataUri)) { // Image only query
+      } else if (flowToUse === 'simple' && (!userMessageContent && userImageDataUri)) {
           updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Analisando a imagem..." });
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate analysis time
+          await new Promise(resolve => setTimeout(resolve, 1000));
       } else if (flowToUse === 'simple' && ( !isSearchEnabled || (detectedQueryTypeResult && (detectedQueryTypeResult.queryType === 'IMAGE_ANALYSIS' || detectedQueryTypeResult.queryType === 'GENERAL_CONVERSATION' )) ) ) {
-         // Simple flow without search (e.g. general convo, or image analysis with text)
          updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: "Preparando uma resposta direta..." });
-         await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate preparation
+         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
-
-      // 3. Generate Response
       let finalStepMessage = "Gerando resposta...";
       if (flowToUse === 'academic') {
         if (searchPerformedAndFoundContext) {
             finalStepMessage = "Gerando resposta com o novo contexto...";
-        } else if (isSearchEnabled && userMessageContent) { // If search was enabled but found nothing
+        } else if (isSearchEnabled && userMessageContent) {
             finalStepMessage = "Gerando resposta com base no conhecimento geral...";
         }
       } else if (flowToUse === 'simple' && userImageDataUri && !userMessageContent) {
@@ -521,12 +583,10 @@ export default function ChatInterface() {
       }
       updateThinkingMessageInSession(currentSessionId, assistantMessageId, { currentProcessingStepMessage: finalStepMessage });
 
-
-      // Get the current set of messages for context, excluding the current user message and thinking placeholder
       const activeSessionMessagesForAI = sessions.find(s => s.id === currentSessionId)?.messages || [];
       const conversationHistoryForAI = activeSessionMessagesForAI
-        .filter(msg => !msg.isThinkingPlaceholder && msg.id !== assistantMessageId && msg.id !== userMessage.id) // Exclude current interaction
-        .slice(-6) // Take last 6 messages for history
+        .filter(msg => !msg.isThinkingPlaceholder && msg.id !== assistantMessageId && msg.id !== userMessage.id)
+        .slice(-6)
         .map(msg => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
 
       let aiResultText: string;
@@ -538,7 +598,7 @@ export default function ChatInterface() {
         };
         const simpleResult: GenerateSimpleResponseOutput = await generateSimpleResponse(simpleInput);
         aiResultText = simpleResult.response;
-      } else { // Academic flow
+      } else {
         const academicInput: GenerateAcademicResponseInput = {
           prompt: userMessage.content, userImageInputDataUri: userMessage.imageDataUri,
           persona: aiPersona || undefined, rules: aiRules || undefined,
@@ -569,69 +629,119 @@ export default function ChatInterface() {
 
   const handleSuggestionClick = (suggestion: string) => {
     if (isLoading) return;
-    // setInputValue(suggestion); // Optionally pre-fill input if desired, but direct send is cleaner
-    handleSendMessage(suggestion); // Send suggestion directly
+    handleSendMessage(suggestion);
   };
-
 
   const handleInputKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault(); // Prevent newline in textarea
-      if (!isLoading && (inputValue.trim() || selectedImageFile)) { // Check if there's content or image
+      event.preventDefault();
+      if (!isLoading && (inputValue.trim() || selectedImageFile)) {
          handleSendMessage();
       }
     }
   };
 
-  // Sort sessions by lastUpdatedAt for display in the sidebar
   const sortedSessions = [...sessions].sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt);
-  const disableNewChatButton = !!activeSession && activeSession.messages.length === 0;
+  const sortedAcademicWorks = [...academicWorks].sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt);
+
+  const disableNewItemButton = appMode === 'chat'
+    ? (!!activeSession && activeSession.messages.length === 0 && !inputValue.trim() && !selectedImageFile)
+    : (!!activeAcademicWork && activeAcademicWork.sections.length === 0); // Potentially add more conditions for academic mode
 
   const handleProfileClick = () => {
-    // Placeholder action for profile click
     toast({ title: "Perfil do Usuário", description: "Funcionalidade de perfil ainda não implementada." });
-    if (isMobile) {
-        setOpenMobile(false);
+    if (isMobile) setOpenMobile(false);
+  };
+
+  const handleNewItem = () => {
+    if (appMode === 'chat') {
+      handleStartNewChatItem();
+    } else {
+      handleStartNewAcademicWorkItem();
     }
+  };
+
+  // Update academic work (e.g., when a section is generated)
+  const updateAcademicWork = (updatedWork: AcademicWork) => {
+    setAcademicWorks(prevWorks =>
+      prevWorks.map(work =>
+        work.id === updatedWork.id ? { ...updatedWork, lastUpdatedAt: Date.now() } : work
+      ).sort((a,b) => b.lastUpdatedAt - a.lastUpdatedAt)
+    );
   };
 
 
   return (
     <>
       <Sidebar collapsible="icon" className="border-r h-svh">
-        <SidebarHeader className="p-3">
+        <SidebarHeader className="p-3 flex flex-col gap-2">
+          <div className="flex w-full gap-1">
+            <Button
+              variant={appMode === 'chat' ? 'default' : 'outline'}
+              className="flex-1 justify-center group-data-[collapsible=icon]:px-0"
+              onClick={() => setAppMode('chat')}
+              size="sm"
+              aria-pressed={appMode === 'chat'}
+              tooltip={{children: "Modo Chat", side:"right", align:"center"}}
+            >
+              <MessageSquareText className="h-4 w-4" />
+              <span className="group-data-[collapsible=icon]:hidden ml-2">Chat</span>
+            </Button>
+            <Button
+              variant={appMode === 'academic' ? 'default' : 'outline'}
+              className="flex-1 justify-center group-data-[collapsible=icon]:px-0"
+              onClick={() => setAppMode('academic')}
+              size="sm"
+              aria-pressed={appMode === 'academic'}
+              tooltip={{children: "Criar Trabalhos", side:"right", align:"center"}}
+            >
+              <BookMarked className="h-4 w-4" />
+              <span className="group-data-[collapsible=icon]:hidden ml-2">Trabalhos</span>
+            </Button>
+          </div>
           <Button
             variant="outline"
             className="w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2"
-            onClick={handleStartNewChat}
-            disabled={disableNewChatButton}
-            title={disableNewChatButton ? "Envie uma mensagem na conversa atual para iniciar uma nova." : "Iniciar nova conversa"}
+            onClick={handleNewItem}
+            disabled={disableNewItemButton && (appMode === 'chat' && !inputValue && !selectedImageFile)}
+            title={disableNewItemButton ? (appMode === 'chat' ? "Envie uma mensagem para iniciar um novo chat." : "Complete o trabalho atual para iniciar um novo.") : (appMode === 'chat' ? "Iniciar novo chat" : "Iniciar novo trabalho")}
           >
             <PlusCircle className="h-4 w-4" />
-            <span className="group-data-[collapsible=icon]:hidden">Nova Conversa</span>
+            <span className="group-data-[collapsible=icon]:hidden">{appMode === 'chat' ? 'Novo Chat' : 'Novo Trabalho'}</span>
           </Button>
         </SidebarHeader>
         <ScrollArea className="flex-1 min-h-0">
-          <div className="p-1 pt-0"> {/* Adjusted padding */}
+          <div className="p-1 pt-0">
             <SidebarMenu>
-              {sortedSessions.map((session) => (
+              {appMode === 'chat' && sortedSessions.map((session) => (
                 <SidebarMenuItem key={session.id}>
                   <SidebarMenuButton
                     onClick={() => {
                       setActiveSessionId(session.id);
-                      if (isMobile) {
-                        setOpenMobile(false); // Close sidebar on mobile after selection
-                      }
+                      if (isMobile) setOpenMobile(false);
                     }}
                     isActive={session.id === activeSessionId}
-                    className={cn(
-                        "w-full text-left justify-start group-data-[collapsible=icon]:justify-center",
-                        {"bg-sidebar-accent text-sidebar-accent-foreground": session.id === activeSessionId}
-                    )}
+                    className={cn("w-full text-left justify-start group-data-[collapsible=icon]:justify-center")}
                     tooltip={{children: session.title, side: "right", align:"center"}}
                   >
                     <MessageSquareText className="h-4 w-4 text-muted-foreground group-data-[collapsible=icon]:text-inherit" />
                     <span className="truncate">{session.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+              {appMode === 'academic' && sortedAcademicWorks.map((work) => (
+                <SidebarMenuItem key={work.id}>
+                  <SidebarMenuButton
+                    onClick={() => {
+                      setActiveAcademicWorkId(work.id);
+                      if (isMobile) setOpenMobile(false);
+                    }}
+                    isActive={work.id === activeAcademicWorkId}
+                    className={cn("w-full text-left justify-start group-data-[collapsible=icon]:justify-center")}
+                    tooltip={{children: work.title, side: "right", align:"center"}}
+                  >
+                    <FileText className="h-4 w-4 text-muted-foreground group-data-[collapsible=icon]:text-inherit" />
+                    <span className="truncate">{work.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -673,74 +783,89 @@ export default function ChatInterface() {
                   <Settings className="h-5 w-5 text-muted-foreground hover:text-accent-foreground" />
                 </Button>
               </SettingsPopover>
-              <Button variant="ghost" size="icon" onClick={() => setIsSearchEnabled(prev => !prev)} aria-label={isSearchEnabled ? "Desativar Automação de Pesquisa Contextual" : "Ativar Automação de Pesquisa Contextual"}>
-                {isSearchEnabled ? <SearchCheck className="h-5 w-5 text-green-600 dark:text-green-400" /> : <SearchSlash className="h-5 w-5 text-muted-foreground" />}
-              </Button>
+              {appMode === 'chat' && (
+                <Button variant="ghost" size="icon" onClick={() => setIsSearchEnabled(prev => !prev)} aria-label={isSearchEnabled ? "Desativar Automação de Pesquisa Contextual" : "Ativar Automação de Pesquisa Contextual"}>
+                    {isSearchEnabled ? <SearchCheck className="h-5 w-5 text-green-600 dark:text-green-400" /> : <SearchSlash className="h-5 w-5 text-muted-foreground" />}
+                </Button>
+              )}
             </div>
           </header>
 
-          <ScrollArea className="flex-1 p-4" viewportRef={chatContainerRef}>
-            <div className="space-y-4">
-              {currentMessages.length === 0 && !isLoading && (
-                <div className="flex flex-col items-center justify-center pt-10 text-center">
-                  <Sparkles className="h-10 w-10 text-primary mb-4" />
-                  <h2 className="text-xl font-semibold text-foreground mb-1">Como posso te ajudar hoje?</h2>
-                  <p className="text-sm text-muted-foreground mb-6">Clique em uma sugestão ou digite sua pergunta abaixo.</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl w-full">
-                    {SUGGESTION_PROMPTS.map((suggestion, index) => (
-                      <Button
-                        key={index}
-                        variant="outline"
-                        className="p-3 h-auto text-sm text-left justify-start leading-snug whitespace-normal hover:bg-accent/10 dark:hover:bg-accent/20"
-                        onClick={() => handleSuggestionClick(suggestion)}
-                        disabled={isLoading}
-                      >
-                        {suggestion}
-                      </Button>
-                    ))}
-                  </div>
+          {appMode === 'chat' && (
+            <>
+              <ScrollArea className="flex-1 p-4" viewportRef={chatContainerRef}>
+                <div className="space-y-4">
+                  {currentMessages.length === 0 && !isLoading && (
+                    <div className="flex flex-col items-center justify-center pt-10 text-center">
+                      <Sparkles className="h-10 w-10 text-primary mb-4" />
+                      <h2 className="text-xl font-semibold text-foreground mb-1">Como posso te ajudar hoje?</h2>
+                      <p className="text-sm text-muted-foreground mb-6">Clique em uma sugestão ou digite sua pergunta abaixo.</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl w-full">
+                        {SUGGESTION_PROMPTS.map((suggestion, index) => (
+                          <Button
+                            key={index}
+                            variant="outline"
+                            className="p-3 h-auto text-sm text-left justify-start leading-snug whitespace-normal hover:bg-accent/10 dark:hover:bg-accent/20"
+                            onClick={() => handleSuggestionClick(suggestion)}
+                            disabled={isLoading}
+                          >
+                            {suggestion}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {currentMessages.map((msg) => (
+                    <ChatMessage
+                      key={msg.id}
+                      message={msg}
+                      typingSpeed={typingSpeed}
+                    />
+                  ))}
                 </div>
-              )}
-              {currentMessages.map((msg) => (
-                <ChatMessage
-                  key={msg.id}
-                  message={msg}
-                  typingSpeed={typingSpeed}
-                />
-              ))}
-            </div>
-          </ScrollArea>
+              </ScrollArea>
 
-          <div className="p-4 border-t bg-background sticky bottom-0">
-            {selectedImagePreview && (
-              <div className="mb-2 relative w-24 h-24 border rounded-md overflow-hidden shadow">
-                <Image src={selectedImagePreview} alt="Selected preview" layout="fill" objectFit="cover" data-ai-hint="image preview" />
-                <Button variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-80 hover:opacity-100" onClick={clearSelectedImage} aria-label="Remover imagem selecionada">
-                  <X className="h-4 w-4" />
-                </Button>
+              <div className="p-4 border-t bg-background sticky bottom-0">
+                {selectedImagePreview && (
+                  <div className="mb-2 relative w-24 h-24 border rounded-md overflow-hidden shadow">
+                    <Image src={selectedImagePreview} alt="Selected preview" layout="fill" objectFit="cover" data-ai-hint="image preview" />
+                    <Button variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-80 hover:opacity-100" onClick={clearSelectedImage} aria-label="Remover imagem selecionada">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+                <form onSubmit={(e) => handleSendMessage(undefined, e)} className="flex gap-2 items-start" ref={formRef}>
+                  <input type="file" ref={fileInputRef} accept="image/png, image/jpeg, image/webp, image/gif" onChange={handleImageFileChange} className="hidden" id="imageUpload" aria-label="Upload de imagem" />
+                  <Button type="button" variant="ghost" size="icon" className="rounded-full flex-shrink-0 mt-1" onClick={() => fileInputRef.current?.click()} disabled={isLoading} aria-label="Anexar imagem">
+                    <Paperclip className="h-5 w-5 text-muted-foreground hover:text-primary" />
+                  </Button>
+                  <Input
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleInputKeyDown}
+                    placeholder="Digite sua mensagem ou envie uma imagem..."
+                    disabled={isLoading}
+                    className="flex-1 rounded-lg px-4 py-2 focus-visible:ring-primary"
+                    aria-label="Message input"
+                  />
+                  <Button type="submit" disabled={isLoading || (!inputValue.trim() && !selectedImageFile)} size="icon" className="rounded-full bg-primary hover:bg-primary/90 disabled:bg-muted flex-shrink-0 mt-1" aria-label="Send message">
+                    {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <SendHorizontal className="h-5 w-5" />}
+                  </Button>
+                </form>
               </div>
-            )}
-            <form onSubmit={(e) => handleSendMessage(undefined, e)} className="flex gap-2 items-start" ref={formRef}>
-              <input type="file" ref={fileInputRef} accept="image/png, image/jpeg, image/webp, image/gif" onChange={handleImageFileChange} className="hidden" id="imageUpload" aria-label="Upload de imagem" />
-              <Button type="button" variant="ghost" size="icon" className="rounded-full flex-shrink-0 mt-1" onClick={() => fileInputRef.current?.click()} disabled={isLoading} aria-label="Anexar imagem">
-                <Paperclip className="h-5 w-5 text-muted-foreground hover:text-primary" />
-              </Button>
-              <Input
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleInputKeyDown}
-                placeholder="Digite sua mensagem ou envie uma imagem..."
-                disabled={isLoading}
-                className="flex-1 rounded-lg px-4 py-2 focus-visible:ring-primary"
-                aria-label="Message input"
-              />
-              <Button type="submit" disabled={isLoading || (!inputValue.trim() && !selectedImageFile)} size="icon" className="rounded-full bg-primary hover:bg-primary/90 disabled:bg-muted flex-shrink-0 mt-1" aria-label="Send message">
-                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <SendHorizontal className="h-5 w-5" />}
-              </Button>
-            </form>
-          </div>
+            </>
+          )}
+
+          {appMode === 'academic' && (
+            <AcademicWorkCreator
+                activeWork={activeAcademicWork}
+                onUpdateWork={updateAcademicWork}
+            />
+          )}
         </div>
       </SidebarInset>
     </>
   );
 }
+
+    
