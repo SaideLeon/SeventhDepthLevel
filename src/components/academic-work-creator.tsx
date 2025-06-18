@@ -3,26 +3,31 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input as ShadInput } from '@/components/ui/input'; // Renamed to avoid conflict
+import { Input as ShadInput } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from "@/components/ui/progress";
-import { Loader2, Download, PlayCircle, BookCheck, AlertTriangle } from 'lucide-react';
+import { Loader2, Download, PlayCircle, BookCheck, AlertTriangle, FileText } from 'lucide-react';
 import MarkdownToDocx from '@/components/MarkdownToDocx';
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { MarkdownWithCode } from '@/components/Markdown/MarkdownWithCode';
-import type { SearchResult, PageContent } from "@/utils/raspagem"; // For scraper results
+import type { SearchResult, PageContent } from "@/utils/raspagem";
 import type { DetectTopicFromTextOutput } from "@/ai/flows/detect-topic-flow";
+import type { FichaLeitura, GenerateFichamentoInput } from "@/ai/flows/generate-fichamento-flow";
+import type { GenerateIndexOutput } from "@/ai/flows/generate-index-flow";
+import type { GenerateIntroductionOutput } from "@/ai/flows/generate-introduction-flow";
+import type { GenerateAcademicSectionOutput } from "@/ai/flows/generate-academic-section-flow";
+import type { GenerateConclusionOutput } from "@/ai/flows/generate-conclusion-flow";
+import type { GenerateBibliographyOutput } from "@/ai/flows/generate-bibliography-flow";
 
 
-// Define types consistent with chat-interface.tsx
-interface AcademicWorkSection {
+export interface AcademicWorkSection {
   title: string;
   content: string;
 }
 
-interface AcademicWork {
+export interface AcademicWork {
   id: string;
   theme: string;
   title: string;
@@ -30,17 +35,8 @@ interface AcademicWork {
   fullGeneratedText?: string;
   createdAt: number;
   lastUpdatedAt: number;
-}
-
-interface FichaLeitura {
-    titulo: string;
-    autor: string;
-    anoPublicacao: string;
-    palavrasChave: string[];
-    resumo: string;
-    citacoesRelevantes: string[];
-    comentariosAdicionais: string;
-    url: string;
+  fichas?: FichaLeitura[]; // Store generated fichas with the work
+  generatedIndex?: string[]; // Store generated index
 }
 
 interface AcademicWorkCreatorProps {
@@ -51,78 +47,130 @@ interface AcademicWorkCreatorProps {
 export default function AcademicWorkCreator({ activeWork, onUpdateWork }: AcademicWorkCreatorProps) {
   const { toast } = useToast();
 
-  const [workTitle, setWorkTitle] = useState(''); // User input for overall theme/title
-  const [targetLanguage, setTargetLanguage] = useState('pt-BR'); // Could be a select later
-  const [citationStyle, setCitationStyle] = useState('APA'); // Could be a select later
+  const [workTheme, setWorkTheme] = useState('');
+  const [targetLanguage, setTargetLanguage] = useState('pt-BR');
+  const [citationStyle, setCitationStyle] = useState('APA');
 
-  // State for "Fichamento" (Research Phase)
+  // Phase 1: Research & Fichamento
   const [isResearching, setIsResearching] = useState(false);
-  const [researchProgress, setResearchProgress] = useState(0); // 0-100
+  const [researchProgress, setResearchProgress] = useState(0);
   const [researchCurrentStep, setResearchCurrentStep] = useState(0);
   const [researchTotalSteps, setResearchTotalSteps] = useState(0);
   const [researchLog, setResearchLog] = useState<string[]>([]);
   const [researchedFichas, setResearchedFichas] = useState<FichaLeitura[]>([]);
   const [detectedTopicForSearch, setDetectedTopicForSearch] = useState<string | null>(null);
-
-  // State for "Desenvolvimento" (Writing Phase)
+  
+  // Phase 2: Writing (Index, Sections, Conclusion, Bibliography)
   const [isWriting, setIsWriting] = useState(false);
-  const [writingProgress, setWritingProgress] = useState(0); // 0-100
-  const [writingCurrentSection, setWritingCurrentSection] = useState(0);
-  const [writingTotalSections, setWritingTotalSections] = useState(0);
+  const [writingProgress, setWritingProgress] = useState(0);
+  const [writingCurrentLogItem, setWritingCurrentLogItem] = useState("");
   const [writingLog, setWritingLog] = useState<string[]>([]);
   const [generatedFullText, setGeneratedFullText] = useState<string | null>(null);
+  const [currentGeneratedIndex, setCurrentGeneratedIndex] = useState<string[]>([]);
+  const [currentDevelopedSections, setCurrentDevelopedSections] = useState<AcademicWorkSection[]>([]);
+
+  // Automatic workflow control
+  const [startFichamentoChain, setStartFichamentoChain] = useState(false);
+  const [fichamentoCompleted, setFichamentoCompleted] = useState(false);
 
 
   useEffect(() => {
     if (activeWork) {
-      setWorkTitle(activeWork.theme || ''); // Initialize with theme
-      setResearchedFichas([]); 
+      setWorkTheme(activeWork.theme || '');
+      setResearchedFichas(activeWork.fichas || []);
       setGeneratedFullText(activeWork.fullGeneratedText || null);
+      setCurrentGeneratedIndex(activeWork.generatedIndex || []);
+      setCurrentDevelopedSections(activeWork.sections || []);
       setResearchLog(activeWork.title ? [`Trabalho "${activeWork.title}" carregado.`] : []);
       setWritingLog([]);
       setIsResearching(false);
       setIsWriting(false);
       setDetectedTopicForSearch(null);
+      setStartFichamentoChain(false);
+      setFichamentoCompleted(false);
     } else {
-      setWorkTitle('');
+      setWorkTheme('');
       setResearchedFichas([]);
       setGeneratedFullText(null);
+      setCurrentGeneratedIndex([]);
+      setCurrentDevelopedSections([]);
       setResearchLog([]);
       setWritingLog([]);
       setDetectedTopicForSearch(null);
+      setStartFichamentoChain(false);
+      setFichamentoCompleted(false);
     }
   }, [activeWork]);
 
-  const addResearchLog = (message: string) => {
+  const addResearchLog = useCallback((message: string) => {
     console.log(`[Pesquisa]: ${message}`);
-    setResearchLog(prev => [...prev.slice(-20), `${new Date().toLocaleTimeString()}: ${message}`]); // Keep last 20 logs
-  };
-  const addWritingLog = (message: string) => {
+    setResearchLog(prev => [...prev.slice(-20), `${new Date().toLocaleTimeString()}: ${message}`]);
+  }, []);
+
+  const addWritingLog = useCallback((message: string) => {
     console.log(`[Desenvolvimento]: ${message}`);
-    setWritingLog(prev => [...prev.slice(-20), `${new Date().toLocaleTimeString()}: ${message}`]); // Keep last 20 logs
+    setWritingCurrentLogItem(`${new Date().toLocaleTimeString()}: ${message}`);
+    setWritingLog(prev => [...prev.slice(-20), `${new Date().toLocaleTimeString()}: ${message}`]);
+  }, []);
+
+  // Auto-start Fichamento (Research) when workTheme is set and startFichamentoChain is true
+  useEffect(() => {
+    if (startFichamentoChain && workTheme.trim() && activeWork && !isResearching && !isWriting) {
+      handleStartResearch();
+      setStartFichamentoChain(false); // Reset trigger
+    }
+  }, [startFichamentoChain, workTheme, activeWork, isResearching, isWriting]);
+
+  // Auto-start Development (Writing) when Fichamento is completed
+  useEffect(() => {
+    if (fichamentoCompleted && activeWork && researchedFichas.length > 0 && !isWriting && !isResearching) {
+      handleStartWriting();
+      setFichamentoCompleted(false); // Reset trigger
+    } else if (fichamentoCompleted && researchedFichas.length === 0) {
+        addWritingLog("⚠️ Pesquisa concluída, mas nenhuma ficha foi gerada. Não é possível iniciar o desenvolvimento do texto automaticamente.");
+        setFichamentoCompleted(false);
+    }
+  }, [fichamentoCompleted, activeWork, researchedFichas, isWriting, isResearching]);
+
+
+  const handleInitiateFullProcess = () => {
+    if (!workTheme.trim()) {
+      toast({ title: "Tema Necessário", description: "Por favor, defina o tema principal do trabalho.", variant: "destructive"});
+      return;
+    }
+    if (activeWork) {
+      onUpdateWork({ ...activeWork, theme: workTheme, title: activeWork.title || workTheme, fichas: [], sections: [], fullGeneratedText: "", generatedIndex: [], lastUpdatedAt: Date.now() });
+    }
+    setResearchedFichas([]);
+    setGeneratedFullText("");
+    setCurrentGeneratedIndex([]);
+    setCurrentDevelopedSections([]);
+    setResearchLog([]);
+    setWritingLog([]);
+    setStartFichamentoChain(true); // Trigger the research phase
   };
 
 
   const handleStartResearch = async () => {
-    if (!activeWork || !workTitle.trim()) {
-      toast({ title: "Erro", description: "Por favor, forneça um tema para o trabalho.", variant: "destructive" });
+    if (!activeWork || !workTheme.trim()) {
+      toast({ title: "Erro", description: "Defina um tema para o trabalho.", variant: "destructive" });
       return;
     }
     setIsResearching(true);
     setResearchedFichas([]);
-    setResearchLog([`Iniciando pesquisa para o tema: "${workTitle}"`]);
+    setResearchLog([`Iniciando pesquisa para o tema: "${workTheme}"`]);
     setResearchProgress(0);
     setResearchCurrentStep(0);
-    setResearchTotalSteps(0); 
+    setResearchTotalSteps(0);
     setDetectedTopicForSearch(null);
 
-    let effectiveSearchTopic = workTitle.trim();
+    let effectiveSearchTopic = workTheme.trim();
 
     // 1. Detect Topic
     addResearchLog(`Detectando tópico principal para "${effectiveSearchTopic}"...`);
     setResearchProgress(5);
     try {
-      const topicResponse = await fetch('/api/detect-topic', {
+      const topicResponse = await fetch('/api/detectTopic', { // Corrected API endpoint name
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ textQuery: effectiveSearchTopic, targetLanguage }),
@@ -138,12 +186,11 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
         addResearchLog(`✅ Tópico detectado para pesquisa: "${effectiveSearchTopic}"`);
       } else {
         addResearchLog(`⚠️ Não foi possível refinar o tópico. Usando o tema original: "${effectiveSearchTopic}"`);
-        setDetectedTopicForSearch(effectiveSearchTopic);
+        setDetectedTopicForSearch(effectiveSearchTopic); // Use original if detection fails
       }
     } catch (error: any) {
       addResearchLog(`❌ Erro ao detectar tópico: ${error.message}. Usando tema original.`);
-      // Continue with original topic
-      setDetectedTopicForSearch(effectiveSearchTopic);
+      setDetectedTopicForSearch(effectiveSearchTopic); // Fallback to original
     }
     setResearchProgress(10);
 
@@ -154,19 +201,20 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
       const scraperSearchResponse = await fetch('/api/raspagem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ termoBusca: effectiveSearchTopic, todasPaginas: true, maxPaginas: 3 }), // Search 3 pages of results to get diverse links
+        body: JSON.stringify({ termoBusca: effectiveSearchTopic, todasPaginas: true, maxPaginas: 3 }),
       });
       if (!scraperSearchResponse.ok) {
          const errorData = await scraperSearchResponse.json().catch(() => ({}));
         throw new Error(`Falha ao buscar artigos: ${errorData.error || scraperSearchResponse.statusText}`);
       }
       const allSearchResults: SearchResult[] = await scraperSearchResponse.json();
-      searchResults = allSearchResults.slice(0, 10); // Limit to 10 articles
+      searchResults = allSearchResults.slice(0, 10);
       addResearchLog(`🔗 ${searchResults.length} artigos encontrados para processamento.`);
       if (searchResults.length === 0) {
-        addResearchLog('Nenhum artigo encontrado. Tente um tema diferente ou verifique os logs.');
+        addResearchLog('Nenhum artigo encontrado. Tente um tema diferente.');
         setIsResearching(false);
         setResearchProgress(100);
+        setFichamentoCompleted(true); // Mark as completed even if no fichas to potentially trigger user action or different flow
         return;
       }
     } catch (error: any) {
@@ -175,7 +223,7 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
       setResearchProgress(100);
       return;
     }
-    setResearchTotalSteps(searchResults.length); // Total steps is number of articles to process for fichas
+    setResearchTotalSteps(searchResults.length);
     setResearchProgress(20);
 
     // 3. Process each article and generate Ficha
@@ -183,12 +231,11 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
     for (let i = 0; i < searchResults.length; i++) {
       const article = searchResults[i];
       setResearchCurrentStep(i + 1);
-      const currentProgress = 20 + ((i + 1) / searchResults.length) * 70; // Fichamento is 70% of research phase
+      const currentProgress = 20 + ((i + 1) / searchResults.length) * 70;
       setResearchProgress(currentProgress);
       addResearchLog(`📄 Processando artigo ${i + 1}/${searchResults.length}: "${article.titulo.substring(0,50)}..."`);
 
       try {
-        // 3a. Scrape content
         const contentResponse = await fetch('/api/raspagem', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -204,39 +251,34 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
             continue;
         }
 
-        // 3b. Simulate Ficha Técnica Generation
-        // TODO: Replace with actual Genkit flow call
-        addResearchLog(`⚙️ Gerando ficha para "${pageContent.titulo || article.titulo}"... (simulado)`);
-        await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500)); // Simulate API call delay
+        addResearchLog(`⚙️ Gerando ficha para "${pageContent.titulo || article.titulo}"...`);
+        const fichamentoResponse = await fetch('/api/fichamento', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(pageContent) // Send the whole PageContent as FichamentoInput
+        });
+        if(!fichamentoResponse.ok) {
+            const errorData = await fichamentoResponse.json().catch(() => ({}));
+            throw new Error(`Falha ao gerar ficha: ${errorData.error || fichamentoResponse.statusText}`);
+        }
+        const fichaGerada: FichaLeitura = await fichamentoResponse.json();
         
-        const palavrasChaveFicha = pageContent.titulo ? pageContent.titulo.toLowerCase().split(" ").filter(w => w.length > 3) : (effectiveSearchTopic.split(" ").slice(0,5));
-
-        const fichaSimulada: FichaLeitura = {
-            titulo: pageContent.titulo || article.titulo,
-            autor: pageContent.autor || "Desconhecido",
-            anoPublicacao: pageContent.dataPublicacao ? new Date(pageContent.dataPublicacao).getFullYear().toString() : new Date().getFullYear().toString(),
-            palavrasChave: [...new Set(palavrasChaveFicha)].slice(0, 5), // Unique keywords
-            resumo: `Resumo simulado do artigo "${pageContent.titulo || article.titulo}". Conteúdo principal: ${pageContent.conteudo?.substring(0, 250)}...`,
-            citacoesRelevantes: [`"Citação relevante simulada de '${pageContent.titulo || article.titulo}'." (Autor, Ano)`],
-            comentariosAdicionais: "Esta é uma ficha gerada automaticamente (simulação).",
-            url: article.url,
-        };
-        fetchedFichas.push(fichaSimulada);
-        setResearchedFichas(prevFichas => [...prevFichas, fichaSimulada]);
-        addResearchLog(`✅ Ficha para "${fichaSimulada.titulo.substring(0,50)}..." criada.`);
+        fetchedFichas.push(fichaGerada);
+        setResearchedFichas(prev => [...prev, fichaGerada]); // Update UI progressively
+        addResearchLog(`✅ Ficha para "${fichaGerada.titulo.substring(0,50)}..." criada.`);
 
       } catch (error: any) {
         addResearchLog(`❌ Erro ao processar artigo "${article.titulo.substring(0,50)}...": ${error.message}`);
       }
     }
-
-    if (activeWork && fetchedFichas.length > 0) {
-        addResearchLog(`📚 Fichamento concluído. ${fetchedFichas.length} fichas geradas. Você pode iniciar o desenvolvimento do trabalho.`);
-    } else if (fetchedFichas.length === 0) {
-        addResearchLog('⚠️ Nenhuma ficha pôde ser gerada. Verifique os logs de erro ou tente um tema diferente.');
+    
+    if (activeWork) {
+        onUpdateWork({ ...activeWork, fichas: fetchedFichas, lastUpdatedAt: Date.now() });
     }
+    addResearchLog(`📚 Fichamento concluído. ${fetchedFichas.length} fichas geradas.`);
     setResearchProgress(100);
     setIsResearching(false);
+    setFichamentoCompleted(true); // Trigger next phase
   };
 
 
@@ -245,91 +287,114 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
         toast({ title: "Erro", description: "Nenhum trabalho ativo.", variant: "destructive" });
         return;
     }
-    if (researchedFichas.length === 0 && !activeWork.fullGeneratedText) { // Allow rewriting if text exists
-      toast({ title: "Aviso", description: "Realize a pesquisa (fichamento) primeiro ou certifique-se de que há fichas disponíveis para gerar um novo trabalho.", variant: "default" });
-      // return; // Allow to proceed if user wants to generate without fichas (e.g. from scratch)
+    if (researchedFichas.length === 0 && !activeWork.fullGeneratedText) {
+      toast({ title: "Aviso", description: "Não há fichas de leitura para basear o desenvolvimento. O texto será gerado com conhecimento geral.", variant: "default" });
     }
 
     setIsWriting(true);
-    setWritingLog([`Iniciando desenvolvimento do trabalho: "${activeWork.title || workTitle}"`]);
+    setWritingLog([`Iniciando desenvolvimento do trabalho: "${activeWork.title || workTheme}"`]);
     setWritingProgress(0);
-    setGeneratedFullText(''); // Clear previous text
-    setWritingCurrentSection(0);
-    setWritingTotalSections(0);
+    setGeneratedFullText('');
+    setCurrentDevelopedSections([]);
+    setCurrentGeneratedIndex([]);
     
-    // 1. Simulate Index Generation
-    // TODO: Replace with actual Genkit flow call
-    addWritingLog("⚙️ Gerando índice do trabalho... (simulado)");
-    await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
-    const simulatedIndexBase = ["Introdução", `Desenvolvimento sobre ${detectedTopicForSearch || activeWork.theme || workTitle}`, "Discussão dos Resultados", "Conclusão"];
-    // Add Bibliografia only if fichas exist or if explicitly requested
-    if (researchedFichas.length > 0) {
-        simulatedIndexBase.push("Referências Bibliográficas");
+    let generatedIndexTitles: string[] = [];
+    try {
+        addWritingLog("⚙️ Gerando índice do trabalho...");
+        const indexResponse = await fetch('/api/generate-index', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ mainTopic: detectedTopicForSearch || activeWork.theme, targetLanguage, numSections: 3 }) // 3 dev sections + intro/conc/biblio
+        });
+        if(!indexResponse.ok) {
+            const errorData = await indexResponse.json().catch(() => ({}));
+            throw new Error(`Falha ao gerar índice: ${errorData.error || indexResponse.statusText}`);
+        }
+        const indexResult: GenerateIndexOutput = await indexResponse.json();
+        generatedIndexTitles = indexResult.generatedIndex;
+        setCurrentGeneratedIndex(generatedIndexTitles);
+        if (activeWork) onUpdateWork({ ...activeWork, generatedIndex: generatedIndexTitles, lastUpdatedAt: Date.now() });
+        addWritingLog(`📑 Índice gerado com ${generatedIndexTitles.length} seções: ${generatedIndexTitles.join(', ')}`);
+    } catch (error: any) {
+        addWritingLog(`❌ Erro ao gerar índice: ${error.message}. Usando estrutura padrão.`);
+        generatedIndexTitles = ["Introdução", `Desenvolvimento sobre ${detectedTopicForSearch || activeWork.theme}`, "Conclusão", "Referências Bibliográficas"];
+        setCurrentGeneratedIndex(generatedIndexTitles);
     }
-    const simulatedIndex = researchedFichas.length > 1 ? 
-        [
-            simulatedIndexBase[0], // Intro
-            // Add a section per ficha if many fichas, or one main development section
-            ...researchedFichas.slice(0,2).map(f => `Análise de "${f.titulo.substring(0,30)}..."`),
-            simulatedIndexBase[1], // Main dev topic
-            simulatedIndexBase[2], // Discussion
-            simulatedIndexBase[3], // Conclusion
-            simulatedIndexBase[4]  // Refs if exists
-        ].filter(Boolean) as string[]
-        : simulatedIndexBase;
-
-    setWritingTotalSections(simulatedIndex.length);
-    addWritingLog(`📑 Índice simulado gerado com ${simulatedIndex.length} seções: ${simulatedIndex.join(', ')}`);
     setWritingProgress(10);
 
-    let currentFullText = `# ${activeWork.title || workTitle}\n\n`; // Add main title
+    let currentFullText = `# ${activeWork.title || workTheme}\n\n`;
     setGeneratedFullText(currentFullText);
+    const tempDevelopedSections: AcademicWorkSection[] = [];
 
-    const newSections: AcademicWorkSection[] = [];
-
-    for (let i = 0; i < simulatedIndex.length; i++) {
-        const sectionTitle = simulatedIndex[i];
-        setWritingCurrentSection(i + 1);
-        const currentProgress = 10 + ((i + 1) / simulatedIndex.length) * 85; // Writing is 85% of this phase
+    for (let i = 0; i < generatedIndexTitles.length; i++) {
+        const sectionTitle = generatedIndexTitles[i];
+        const currentProgress = 10 + ((i + 1) / generatedIndexTitles.length) * 85;
         setWritingProgress(currentProgress);
-        addWritingLog(`✍️ Escrevendo seção ${i+1}/${simulatedIndex.length}: "${sectionTitle}"... (simulado)`);
+        addWritingLog(`✍️ Escrevendo seção ${i+1}/${generatedIndexTitles.length}: "${sectionTitle}"...`);
         
-        // Simulate API call to generate section content
-        // TODO: Replace with actual Genkit flow calls (developAcademicSectionFlow, etc.)
-        await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000)); 
-        
-        let sectionContent = `## ${sectionTitle}\n\n`;
-        if (sectionTitle.toLowerCase().includes("introdução")) {
-            sectionContent += `Esta é a introdução simulada para o trabalho sobre "${detectedTopicForSearch || activeWork.theme || workTitle}". Ela definiria o escopo, objetivos e a estrutura do trabalho.\n\n`;
-        } else if (sectionTitle.toLowerCase().includes("referências bibliográficas") || sectionTitle.toLowerCase().includes("bibliografia")) {
-            if (researchedFichas.length > 0) {
-                sectionContent += "Aqui seriam listadas as referências com base nas fichas:\n";
-                researchedFichas.forEach(ficha => {
-                    sectionContent += `*   ${ficha.autor || 'Autor Desconhecido'} (${ficha.anoPublicacao || 's.d.'}). *${ficha.titulo}*. Disponível em: <${ficha.url}>.\n`;
+        let sectionContent = "";
+        try {
+            const sectionTitleLower = sectionTitle.toLowerCase();
+            let response;
+            if (sectionTitleLower.includes("introdução")) {
+                response = await fetch('/api/generate-introduction', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ mainTopic: detectedTopicForSearch || activeWork.theme, generatedIndex: generatedIndexTitles, targetLanguage })
                 });
-            } else {
-                sectionContent += "Nenhuma ficha de leitura foi processada para gerar a bibliografia.\n";
+                if (!response.ok) throw new Error(await response.text());
+                const result: GenerateIntroductionOutput = await response.json();
+                sectionContent = result.introduction;
+            } else if (sectionTitleLower.includes("conclusão")) {
+                const introContent = tempDevelopedSections.find(s => s.title.toLowerCase().includes("introdução"))?.content;
+                response = await fetch('/api/generate-conclusion', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ mainTopic: detectedTopicForSearch || activeWork.theme, introductionContent: introContent, developedSectionsContent: tempDevelopedSections, targetLanguage})
+                });
+                 if (!response.ok) throw new Error(await response.text());
+                const result: GenerateConclusionOutput = await response.json();
+                sectionContent = result.conclusion;
+            } else if (sectionTitleLower.includes("bibliografia") || sectionTitleLower.includes("referências")) {
+                 response = await fetch('/api/generate-bibliography', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ fichasDeLeitura: researchedFichas, citationStyle, targetLanguage })
+                });
+                 if (!response.ok) throw new Error(await response.text());
+                const result: GenerateBibliographyOutput = await response.json();
+                sectionContent = result.bibliography;
+            } else { // Development section
+                 response = await fetch('/api/generate-academic-section', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        sectionTitle,
+                        mainTopic: detectedTopicForSearch || activeWork.theme,
+                        fichasDeLeitura: researchedFichas,
+                        completedSections: tempDevelopedSections,
+                        targetLanguage,
+                        citationStyle,
+                        wordCountTarget: 500
+                    })
+                });
+                if (!response.ok) throw new Error(await response.text());
+                const result: GenerateAcademicSectionOutput = await response.json();
+                sectionContent = result.sectionContent;
             }
-        } else if (sectionTitle.toLowerCase().includes("conclusão")) {
-            sectionContent += `Esta é a conclusão simulada, resumindo os principais pontos e talvez sugerindo trabalhos futuros relacionados a "${detectedTopicForSearch || activeWork.theme || workTitle}".\n\n`;
-        } else { // Generic development section
-            sectionContent += `Este é o conteúdo simulado para a seção "${sectionTitle}". Ele seria gerado pela IA com base nas ${researchedFichas.length} fichas de leitura disponíveis (se houver) e no tema geral. `;
-            if (researchedFichas.length > 0) {
-                const randomFicha = researchedFichas[Math.floor(Math.random() * researchedFichas.length)];
-                sectionContent += `Por exemplo, um parágrafo poderia discutir "${randomFicha.palavrasChave.join(', ')}" com base na ficha de "${randomFicha.titulo.substring(0,30)}...". \n\nCitações como "${randomFicha.citacoesRelevantes[0] || '(Autor, Ano)'}" seriam incluídas.`;
-            } else {
-                sectionContent += `Como não há fichas de leitura, o desenvolvimento seria baseado no conhecimento geral da IA sobre "${detectedTopicForSearch || activeWork.theme || workTitle}".`;
-            }
-            sectionContent += `\n\nEste parágrafo continua o desenvolvimento da seção, explorando mais aspectos do tópico, com análises e exemplos.\n\n`;
+        } catch (error: any) {
+            addWritingLog(`❌ Erro ao gerar conteúdo para "${sectionTitle}": ${error.message || String(error)}. Usando placeholder.`);
+            sectionContent = `Conteúdo para "${sectionTitle}" não pôde ser gerado devido a um erro.`;
         }
         
-        currentFullText += sectionContent + "\n\n";
-        setGeneratedFullText(currentFullText); // Update preview in real-time
-        newSections.push({ title: sectionTitle, content: sectionContent });
+        const currentSection: AcademicWorkSection = { title: sectionTitle, content: sectionContent };
+        tempDevelopedSections.push(currentSection);
+        setCurrentDevelopedSections(prev => [...prev, currentSection]);
+
+        currentFullText += `## ${sectionTitle}\n\n${sectionContent}\n\n`;
+        setGeneratedFullText(currentFullText);
         addWritingLog(`✅ Seção "${sectionTitle}" escrita.`);
     }
 
-    onUpdateWork({ ...activeWork, sections: newSections, fullGeneratedText: currentFullText, title: activeWork.title || workTitle, theme: workTitle, lastUpdatedAt: Date.now() });
+    if (activeWork) {
+      onUpdateWork({ ...activeWork, sections: tempDevelopedSections, fullGeneratedText: currentFullText, title: activeWork.title || workTheme, theme: workTheme, lastUpdatedAt: Date.now() });
+    }
     addWritingLog("🎉 Desenvolvimento do trabalho concluído!");
     setWritingProgress(100);
     setIsWriting(false);
@@ -354,43 +419,47 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
           <CardDescription>Defina o tema, inicie a pesquisa e, em seguida, o desenvolvimento do seu trabalho.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 md:space-y-4">
-          <div>
-            <Label htmlFor="work-title">Tema Principal / Título Provisório do Trabalho:</Label>
-            <ShadInput 
-              id="work-title" 
-              value={workTitle} 
-              onChange={(e) => {
-                setWorkTitle(e.target.value);
-                // Update activeWork theme as user types if it's the current one
-                if(activeWork) onUpdateWork({...activeWork, theme: e.target.value, title: activeWork.title || e.target.value, lastUpdatedAt: Date.now() });
-              }}
-              placeholder="Ex: O impacto da Inteligência Artificial na Educação Superior em Moçambique"
-              disabled={isResearching || isWriting}
-              className="text-sm md:text-base"
-            />
+          <div className="flex flex-col sm:flex-row gap-2 items-end">
+            <div className="flex-grow w-full">
+              <Label htmlFor="work-theme">Tema Principal / Título Provisório:</Label>
+              <ShadInput 
+                id="work-theme" 
+                value={workTheme} 
+                onChange={(e) => setWorkTheme(e.target.value)}
+                placeholder="Ex: O impacto da IA na Educação Superior em Moçambique"
+                disabled={isResearching || isWriting}
+                className="text-sm md:text-base"
+              />
+            </div>
+            <Button 
+                onClick={handleInitiateFullProcess} 
+                disabled={isResearching || isWriting || !workTheme.trim()} 
+                className="w-full sm:w-auto flex-shrink-0"
+                size="default"
+              >
+                {(isResearching || isWriting) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
+                {(isResearching || isWriting) ? 'Processando...' : 'Iniciar Processo Completo'}
+            </Button>
           </div>
-          {/* Add selects for targetLanguage and citationStyle later */}
         </CardContent>
       </Card>
 
       <div className="grid md:grid-cols-2 gap-2 md:gap-4 flex-1 min-h-0">
-        {/* Research Panel */}
         <Card className="flex flex-col">
           <CardHeader className="py-3 md:py-4">
             <CardTitle className="text-base md:text-lg">1. Pesquisa e Fichamento</CardTitle>
+            <CardDescription className="text-xs">
+              Detecta o tópico, busca até 10 fontes e gera fichas de leitura.
+              {detectedTopicForSearch && <span className="block mt-1">Tópico para pesquisa: <strong className="text-primary">{detectedTopicForSearch}</strong></span>}
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 space-y-2 md:space-y-3 flex flex-col min-h-0">
-            <Button 
-              onClick={handleStartResearch} 
-              disabled={isResearching || isWriting || !workTitle.trim()} 
-              className="w-full flex-shrink-0"
-              size="sm"
-            >
-              {isResearching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
-              {isResearching ? `Pesquisando ${researchCurrentStep}/${researchTotalSteps}...` : 'Iniciar Pesquisa (até 10 fontes)'}
-            </Button>
-            {isResearching && <Progress value={researchProgress} className="w-full h-2 flex-shrink-0" />}
-            
+            {isResearching && (
+              <div className="flex-shrink-0">
+                <Progress value={researchProgress} className="w-full h-2" />
+                <p className="text-xs text-muted-foreground text-center mt-1">Passo {researchCurrentStep} de {researchTotalSteps}</p>
+              </div>
+            )}
             <Label className="text-xs md:text-sm pt-1">Log da Pesquisa:</Label>
             <ScrollArea className="h-24 md:h-32 w-full rounded-md border p-2 text-xs flex-shrink-0 bg-muted/30">
               {researchLog.length === 0 && !isResearching && <div className="text-muted-foreground">Aguardando início da pesquisa...</div>}
@@ -399,13 +468,14 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
             
             <Label className="text-xs md:text-sm pt-1">Fichas Geradas ({researchedFichas.length}):</Label>
              <ScrollArea className="flex-1 w-full rounded-md border p-2 text-xs bg-muted/30 min-h-[5rem] md:min-h-[6rem]">
-              {researchedFichas.length === 0 && !isResearching && <div className="text-muted-foreground">Nenhuma ficha gerada ainda.</div>}
               {isResearching && researchedFichas.length === 0 && <div className="text-muted-foreground">Gerando fichas...</div>}
+              {!isResearching && researchedFichas.length === 0 && <div className="text-muted-foreground">Nenhuma ficha gerada ainda.</div>}
               {researchedFichas.map((ficha, i) => (
                 <details key={i} className="mb-1 p-1.5 border-b border-border last:border-b-0">
-                    <summary className="font-semibold cursor-pointer text-primary hover:underline">{ficha.titulo.substring(0,60)}...</summary>
-                    <p className="mt-0.5 text-muted-foreground text-[11px]"><strong>Autor:</strong> {ficha.autor}</p>
-                    <p className="text-muted-foreground text-[11px]"><strong>Resumo:</strong> {ficha.resumo.substring(0,120)}...</p>
+                    <summary className="font-semibold cursor-pointer text-primary hover:underline text-xs">{ficha.titulo.substring(0,60)}...</summary>
+                    <p className="mt-0.5 text-muted-foreground text-[11px]"><strong>Autor:</strong> {ficha.autor || "N/A"} ({ficha.anoPublicacao || "s.d."})</p>
+                    <p className="text-muted-foreground text-[11px]"><strong>Resumo:</strong> {ficha.resumo.substring(0,100)}...</p>
+                    {ficha.palavrasChave && ficha.palavrasChave.length > 0 && <p className="text-muted-foreground text-[11px]"><strong>Palavras-chave:</strong> {ficha.palavrasChave.join(', ')}</p>}
                     <a href={ficha.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-[11px]">Ver fonte</a>
                 </details>
               ))}
@@ -416,43 +486,41 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
            </CardFooter>
         </Card>
 
-        {/* Writing Panel */}
         <Card className="flex flex-col">
           <CardHeader className="py-3 md:py-4">
             <CardTitle className="text-base md:text-lg">2. Desenvolvimento do Trabalho</CardTitle>
+            <CardDescription className="text-xs">Gera índice, introdução, desenvolvimento das seções, conclusão e bibliografia.</CardDescription>
           </CardHeader>
           <CardContent className="flex-1 space-y-2 md:space-y-3 flex flex-col min-h-0">
-             <Button 
-                onClick={handleStartWriting} 
-                disabled={isWriting || isResearching || (!activeWork.fullGeneratedText && researchedFichas.length === 0)} 
-                className="w-full flex-shrink-0"
-                size="sm"
-            >
-              {isWriting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
-              {isWriting ? `Escrevendo ${writingCurrentSection}/${writingTotalSections}...` : 'Iniciar Desenvolvimento'}
-            </Button>
-            {isWriting && <Progress value={writingProgress} className="w-full h-2 flex-shrink-0" />}
-
+             {isWriting && (
+                <div className="flex-shrink-0">
+                    <Progress value={writingProgress} className="w-full h-2" />
+                    <p className="text-xs text-muted-foreground text-center mt-1">{writingCurrentLogItem || "Preparando para escrever..."}</p>
+                </div>
+             )}
             <Label className="text-xs md:text-sm pt-1">Log do Desenvolvimento:</Label>
             <ScrollArea className="h-24 md:h-32 w-full rounded-md border p-2 text-xs flex-shrink-0 bg-muted/30">
                 {writingLog.length === 0 && !isWriting && <div className="text-muted-foreground">Aguardando início do desenvolvimento...</div>}
+                {isWriting && writingLog.length === 0 && <div className="text-muted-foreground">Iniciando...</div>}
                 {writingLog.map((log, i) => <div key={i}>{log}</div>)}
             </ScrollArea>
 
             <Label className="text-xs md:text-sm pt-1">Conteúdo Gerado (Prévia):</Label>
-            <ScrollArea className="flex-1 w-full rounded-md border p-2 bg-muted/30 min-h-[5rem] md:min-h-[6rem]">
+            <ScrollArea className="flex-1 w-full rounded-md border p-2 bg-card min-h-[5rem] md:min-h-[6rem]">
                 {generatedFullText ? (
                     <MarkdownWithCode content={generatedFullText} />
                 ) : (
-                    <div className="text-xs text-muted-foreground">Nenhum conteúdo gerado ainda. Clique em "Iniciar Desenvolvimento".</div>
+                    <div className="text-xs text-muted-foreground">
+                        {isWriting ? "Gerando conteúdo..." : "Nenhum conteúdo gerado ainda."}
+                    </div>
                 )}
             </ScrollArea>
           </CardContent>
           <CardFooter className="py-2 md:py-3 border-t flex justify-between items-center">
-             <p className="text-xs text-muted-foreground flex-1 mr-2">Fase de escrita do trabalho usando as fichas e o tema.</p>
+             <p className="text-xs text-muted-foreground flex-1 mr-2">Fase de escrita do trabalho.</p>
             <MarkdownToDocx 
                 markdownContent={generatedFullText} 
-                fileName={`Cognick_Trabalho_${(activeWork?.title || workTitle || 'Academico').replace(/\s+/g, '_').substring(0,30)}`} 
+                fileName={`Cognick_Trabalho_${(activeWork?.title || workTheme || 'Academico').replace(/\s+/g, '_').substring(0,30)}`} 
                 disabled={!generatedFullText || isWriting || isResearching}
             />
           </CardFooter>
@@ -461,5 +529,4 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
     </div>
   );
 }
-
     
