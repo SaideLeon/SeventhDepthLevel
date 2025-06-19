@@ -10,8 +10,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z}from 'genkit';
-// Assuming FichaLeitura type for input will be adapted from the Groq FichaLeitura (src/types.ts)
-// For Zod validation, we define what this flow *expects*.
 
 const FichaLeituraInputSchemaForGenkit = z.object({
   url: z.string().describe("URL of the source material."),
@@ -21,7 +19,6 @@ const FichaLeituraInputSchemaForGenkit = z.object({
   palavrasChave: z.array(z.string()).optional().describe("A list of main keywords summarizing the content."),
   resumo: z.string().describe("A concise summary of the content."),
   citacoesRelevantes: z.array(z.string()).optional().describe("Direct short quotes from the text."),
-  // comentariosAdicionais: z.string().optional(), // Not present in Groq FichaLeitura
 });
 export type FichaLeituraForGenkit = z.infer<typeof FichaLeituraInputSchemaForGenkit>;
 
@@ -46,7 +43,6 @@ export async function generateAcademicSection(input: GenerateAcademicSectionInpu
   return generateAcademicSectionFlow(input);
 }
 
-// Register Handlebars helper at the module level
 ai.registry.addHandlebarsHelper('substring', function (str: string, start: number, end: number) {
   if (typeof str === 'string') {
     return str.substring(start, end);
@@ -108,7 +104,8 @@ Instruções para a Seção "{{sectionTitle}}":
 - Organize o conteúdo para que flua bem e cubra os aspectos principais sugeridos pelo título da seção "{{sectionTitle}}" dentro do contexto do tema "{{mainTopic}}".
 - NÃO inclua o título da seção ("{{sectionTitle}}") no início do conteúdo gerado, pois ele já será o título da seção.
 
-A sua resposta DEVE ser um objeto JSON com uma única chave "sectionContent". O valor dessa chave será o conteúdo da seção em formato Markdown.
+Sua resposta DEVE ser EXCLUSIVAMENTE um objeto JSON válido, sem nenhum texto ou formatação Markdown antes ou depois dele.
+O objeto JSON deve ter uma única chave "sectionContent". O valor dessa chave será o conteúdo da seção em formato Markdown.
 
 Exemplo de formato de saída JSON esperado:
 {
@@ -125,10 +122,17 @@ const generateAcademicSectionFlow = ai.defineFlow(
   },
   async (input) => {
     const {output} = await academicSectionPrompt(input);
-    if (!output || typeof output.sectionContent !== 'string') {
-      throw new Error('AI model did not produce valid section content in the expected format.');
-    }
-    return output;
+    if (
+        !output ||
+        typeof output !== 'object' ||
+        !output.hasOwnProperty('sectionContent') ||
+        typeof output.sectionContent !== 'string'
+      ) {
+        const actualOutputForError = output ? JSON.stringify(output, null, 2).substring(0, 200) : String(output);
+        console.error(`[generateAcademicSectionFlow] Invalid output structure. Expected { sectionContent: string }, got: ${actualOutputForError}`);
+        throw new Error(`AI model did not produce the expected output structure for sectionContent. Actual: ${actualOutputForError}...`);
+      }
+    return output as GenerateAcademicSectionOutput;
   }
 );
     

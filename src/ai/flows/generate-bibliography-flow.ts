@@ -11,13 +11,11 @@
 import {ai} from '@/ai/genkit';
 import {z}from 'genkit';
 
-// Input schema for bibliography generation, expecting fields that FichaLeitura (Groq or adapted) provides.
 const FichaLeituraInputSchemaForBiblio = z.object({
   url: z.string().describe("URL of the source material."),
   titulo: z.string().describe("Title of the source material."),
   autor: z.string().optional().describe("Author(s) of the source material."),
   anoPublicacao: z.string().optional().describe("Year of publication. Use 's.d.' if not found."),
-  // palavrasChave are not strictly needed for bibliography but kept if schema is reused
   palavrasChave: z.array(z.string()).optional().describe("A list of main keywords summarizing the content."), 
 });
 export type FichaLeituraForBiblio = z.infer<typeof FichaLeituraInputSchemaForBiblio>;
@@ -69,7 +67,8 @@ Instruções para a Bibliografia:
 - Liste as referências em ordem alfabética pelo sobrenome do primeiro autor (ou pelo título, se não houver autor).
 - Cada referência deve ser um item de uma lista não ordenada em Markdown (usando '* ').
 
-A sua resposta DEVE ser um objeto JSON com uma única chave "bibliography". O valor dessa chave será a lista de referências em formato Markdown.
+Sua resposta DEVE ser EXCLUSIVAMENTE um objeto JSON válido, sem nenhum texto ou formatação Markdown antes ou depois dele.
+O objeto JSON deve ter uma única chave "bibliography". O valor dessa chave será a lista de referências em formato Markdown.
 Não inclua o título "Referências Bibliográficas" ou "Bibliografia" dentro do valor do campo "bibliography".
 
 Exemplo de formato de saída JSON esperado (para estilo APA simplificado):
@@ -92,10 +91,17 @@ const generateBibliographyFlow = ai.defineFlow(
       return { bibliography: "Nenhuma fonte fornecida para gerar a bibliografia." };
     }
     const {output} = await bibliographyPrompt(input);
-    if (!output || typeof output.bibliography !== 'string') {
-      throw new Error('AI model did not produce a valid bibliography in the expected format.');
-    }
-    return output;
+    if (
+        !output ||
+        typeof output !== 'object' ||
+        !output.hasOwnProperty('bibliography') ||
+        typeof output.bibliography !== 'string'
+      ) {
+        const actualOutputForError = output ? JSON.stringify(output, null, 2).substring(0, 200) : String(output);
+        console.error(`[generateBibliographyFlow] Invalid output structure. Expected { bibliography: string }, got: ${actualOutputForError}`);
+        throw new Error(`AI model did not produce the expected output structure for bibliography. Actual: ${actualOutputForError}...`);
+      }
+    return output as GenerateBibliographyOutput;
   }
 );
     

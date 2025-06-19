@@ -28,7 +28,6 @@ export async function generateConclusion(input: GenerateConclusionInput): Promis
   return generateConclusionFlow(input);
 }
 
-// Register Handlebars helper at the module level
 ai.registry.addHandlebarsHelper('substring', function (str: string, start: number, end: number) {
   if (typeof str === 'string') {
     return str.substring(start, end);
@@ -66,7 +65,8 @@ A conclusão deve:
 5.  Ser escrita em tom formal e acadêmico.
 6.  Ter aproximadamente 200-300 palavras.
 
-A sua resposta DEVE ser um objeto JSON com uma única chave "conclusion". O valor dessa chave será o texto da conclusão em formato Markdown.
+Sua resposta DEVE ser EXCLUSIVAMENTE um objeto JSON válido, sem nenhum texto ou formatação Markdown antes ou depois dele.
+O objeto JSON deve ter uma única chave "conclusion". O valor dessa chave será o texto da conclusão em formato Markdown.
 Não inclua o título "Conclusão" dentro do valor do campo "conclusion".
 
 Exemplo de formato de saída JSON esperado:
@@ -84,10 +84,17 @@ const generateConclusionFlow = ai.defineFlow(
   },
   async (input) => {
     const {output} = await conclusionPrompt(input);
-    if (!output || typeof output.conclusion !== 'string') {
-      throw new Error('AI model did not produce a valid conclusion in the expected format.');
-    }
-    return output;
+    if (
+        !output ||
+        typeof output !== 'object' ||
+        !output.hasOwnProperty('conclusion') ||
+        typeof output.conclusion !== 'string'
+      ) {
+        const actualOutputForError = output ? JSON.stringify(output, null, 2).substring(0, 200) : String(output);
+        console.error(`[generateConclusionFlow] Invalid output structure. Expected { conclusion: string }, got: ${actualOutputForError}`);
+        throw new Error(`AI model did not produce the expected output structure for conclusion. Actual: ${actualOutputForError}...`);
+      }
+    return output as GenerateConclusionOutput;
   }
 );
     

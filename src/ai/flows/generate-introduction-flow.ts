@@ -52,8 +52,9 @@ A introdução deve:
 5.  Ser escrita em tom formal e acadêmico.
 6.  Ter aproximadamente 200-300 palavras.
 
-A sua resposta DEVE ser um objeto JSON com uma única chave "introduction". O valor dessa chave será o texto da introdução em formato Markdown.
-Não inclua o título "Introdução" dentro do valor do campo "introduction", pois ele já será um título de seção no documento final.
+Sua resposta DEVE ser EXCLUSIVAMENTE um objeto JSON válido, sem nenhum texto ou formatação Markdown antes ou depois dele.
+O objeto JSON deve ter uma única chave "introduction". O valor dessa chave será o texto da introdução em formato Markdown.
+Não inclua o título "Introdução" dentro do valor do campo "introduction".
 
 Exemplo de formato de saída JSON esperado:
 {
@@ -70,10 +71,17 @@ const generateIntroductionFlow = ai.defineFlow(
   },
   async (input) => {
     const {output} = await introductionPrompt(input);
-    if (!output || typeof output.introduction !== 'string') {
-      throw new Error('AI model did not produce a valid introduction in the expected format.');
-    }
-    return output;
+    if (
+        !output ||
+        typeof output !== 'object' ||
+        !output.hasOwnProperty('introduction') ||
+        typeof output.introduction !== 'string'
+      ) {
+        const actualOutputForError = output ? JSON.stringify(output, null, 2).substring(0, 200) : String(output);
+        console.error(`[generateIntroductionFlow] Invalid output structure. Expected { introduction: string }, got: ${actualOutputForError}`);
+        throw new Error(`AI model did not produce the expected output structure for introduction. Actual: ${actualOutputForError}...`);
+      }
+    return output as GenerateIntroductionOutput;
   }
 );
     
