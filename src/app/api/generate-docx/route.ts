@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
-import { Document, Paragraph, HeadingLevel, ImageRun, Packer, AlignmentType, TextRun, IImageOptions, Table, TableCell, TableRow, WidthType, BorderStyle } from 'docx';
+import { Document, Paragraph, HeadingLevel, ImageRun, Packer, AlignmentType, TextRun, IImageOptions, Table, TableCell, TableRow, WidthType, BorderStyle, ShadingType } from 'docx';
 import MarkdownIt from 'markdown-it';
 
 const md = new MarkdownIt({ html: false, linkify: true, typographer: true, breaks: true });
@@ -22,9 +22,9 @@ async function downloadImage(url: string): Promise<Buffer | null> {
       responseType: 'arraybuffer',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Referer': 'https://www.todamateria.com.br/' 
+        'Referer': 'https://www.todamateria.com.br/'
       },
-      timeout: 15000, 
+      timeout: 15000,
     });
     return Buffer.from(response.data);
   } catch (error) {
@@ -48,55 +48,55 @@ export async function POST(req: NextRequest) {
     }
 
     const tokens = md.parse(markdownContent, {});
-    const docChildren: (Paragraph | Table | any)[] = []; 
+    const docChildren: (Paragraph | Table | any)[] = [];
 
     let currentParagraphRuns: TextRun[] = [];
-    let currentHeadingLevel: HeadingLevel | undefined = undefined;
+    let currentHeadingStyleId: string | undefined = undefined; // Stores style ID like "Heading1"
     let isInsideList = false;
     let listLevel = 0;
     let inTable = false;
     let tableRows: TableRow[] = [];
     let currentRowCells: Paragraph[][] = [];
+    let isInsideBlockquote = false;
 
+    const headingStyleMap: { [key: string]: string } = {
+      'h1': "Heading1", 'h2': "Heading2",
+      'h3': "Heading3", 'h4': "Heading4",
+      'h5': "Heading5", 'h6': "Heading6",
+    };
 
     const flushParagraph = () => {
       if (currentParagraphRuns.length > 0) {
         const paragraphConfig: any = {
           children: [...currentParagraphRuns],
-          spacing: { after: 120, line: 360 }, 
         };
-        if (currentHeadingLevel) {
-          paragraphConfig.heading = currentHeadingLevel;
-          paragraphConfig.alignment = currentHeadingLevel === HeadingLevel.HEADING_1 ? AlignmentType.CENTER : AlignmentType.LEFT;
+        if (currentHeadingStyleId) {
+          paragraphConfig.style = currentHeadingStyleId;
+        } else if (isInsideList) {
+          paragraphConfig.bullet = { level: listLevel };
+          // Styling (font, size, alignment, spacing) for lists is handled by numbering configuration
+        } else if (isInsideBlockquote) {
+          paragraphConfig.style = "BlockquoteStyle";
         } else {
-           paragraphConfig.alignment = AlignmentType.JUSTIFIED;
-        }
-        if (isInsideList) {
-            paragraphConfig.bullet = { level: listLevel };
-            paragraphConfig.indent = { left: 720 * (listLevel + 1), hanging: 360 };
+          paragraphConfig.style = "Normal";
         }
         docChildren.push(new Paragraph(paragraphConfig));
         currentParagraphRuns = [];
-        currentHeadingLevel = undefined; 
+        currentHeadingStyleId = undefined;
       }
     };
-    
+
     for (const token of tokens) {
       switch (token.type) {
         case 'heading_open':
           flushParagraph();
-          const levelMap: { [key: string]: HeadingLevel } = {
-            'h1': HeadingLevel.HEADING_1, 'h2': HeadingLevel.HEADING_2,
-            'h3': HeadingLevel.HEADING_3, 'h4': HeadingLevel.HEADING_4,
-            'h5': HeadingLevel.HEADING_5, 'h6': HeadingLevel.HEADING_6,
-          };
-          currentHeadingLevel = levelMap[token.tag] || HeadingLevel.HEADING_3; 
+          currentHeadingStyleId = headingStyleMap[token.tag] || "Heading3";
           break;
 
         case 'paragraph_open':
-          flushParagraph(); 
+          flushParagraph();
           break;
-        
+
         case 'paragraph_close':
           flushParagraph();
           break;
@@ -104,7 +104,8 @@ export async function POST(req: NextRequest) {
         case 'inline':
           if (token.children) {
             for (const child of token.children) {
-              let textRunOptions: {text?: string, bold?: boolean, italics?: boolean, font?: {name: string}, size?: number, break?: number, style?: string} = {};
+              let textRunOptions: any = {font: "Times New Roman", size: 24}; // Default to TNR 12pt
+
               if (child.type === 'text') {
                 textRunOptions.text = child.content;
               } else if (child.type === 'strong_open') {
@@ -112,22 +113,21 @@ export async function POST(req: NextRequest) {
                 if (nextChild && nextChild.type === 'text') {
                   textRunOptions.text = nextChild.content;
                   textRunOptions.bold = true;
-                  token.children.splice(token.children.indexOf(child) + 1, 1); 
+                  token.children.splice(token.children.indexOf(child) + 1, 1);
                 }
               } else if (child.type === 'em_open') {
                 const nextChild = token.children[token.children.indexOf(child) + 1];
                 if (nextChild && nextChild.type === 'text') {
                   textRunOptions.text = nextChild.content;
                   textRunOptions.italics = true;
-                   token.children.splice(token.children.indexOf(child) + 1, 1);
+                  token.children.splice(token.children.indexOf(child) + 1, 1);
                 }
               } else if (child.type === 'code_inline') {
                  textRunOptions.text = child.content;
-                 textRunOptions.font = { name: 'Courier New' };
-                 textRunOptions.size = 20; // 10pt
+                 // Font and size already set to TNR 12pt by default for textRunOptions
               }
               else if (child.type === 'image') {
-                flushParagraph(); 
+                flushParagraph();
                 const srcAttr = child.attrs.find(attr => attr[0] === 'src');
                 const altAttr = child.attrs.find(attr => attr[0] === 'alt');
                 const src = srcAttr ? srcAttr[1] : null;
@@ -139,12 +139,8 @@ export async function POST(req: NextRequest) {
                     try {
                         const imageRunOptions: IImageOptions = {
                             data: imageBuffer,
-                            transformation: { width: 450, height: 300 }, 
+                            transformation: { width: 450, height: 300 },
                         };
-                         // Attempt to get actual dimensions for better scaling (optional)
-                        // This part is tricky without a full image library on server, 
-                        // so fixed size or client-provided dimensions are safer.
-                        // For now, using fixed size for simplicity.
                         docChildren.push(new Paragraph({
                             children: [ new ImageRun(imageRunOptions) ],
                             alignment: AlignmentType.CENTER,
@@ -152,20 +148,19 @@ export async function POST(req: NextRequest) {
                         }));
                         if (alt) {
                             docChildren.push(new Paragraph({
-                            children: [new TextRun({ text: alt, italics: true, size: 18 })], // 9pt
-                            alignment: AlignmentType.CENTER,
-                            spacing: { after: 60 },
+                              children: [new TextRun({ text: alt })], // TextRun content will be styled by ImageCaption
+                              style: "ImageCaption",
                             }));
                         }
                     } catch (imgError) {
                         console.warn("Erro ao criar ImageRun: ", imgError);
-                         docChildren.push(new Paragraph({ text: `[Imagem indisponível: ${alt}]` , alignment: AlignmentType.CENTER}));
+                         docChildren.push(new Paragraph({ text: `[Imagem indisponível: ${alt}]`, style: "Normal", alignment: AlignmentType.CENTER}));
                     }
                   } else {
-                     docChildren.push(new Paragraph({ text: `[Falha ao carregar imagem: ${alt}]`, alignment: AlignmentType.CENTER }));
+                     docChildren.push(new Paragraph({ text: `[Falha ao carregar imagem: ${alt}]`, style: "Normal", alignment: AlignmentType.CENTER }));
                   }
                 }
-                continue; // Image is a block element, don't add to currentParagraphRuns
+                continue;
               } else if (child.type === 'link_open') {
                 const hrefAttr = child.attrs.find(attr => attr[0] === 'href');
                 const href = hrefAttr ? hrefAttr[1] : '#';
@@ -175,20 +170,24 @@ export async function POST(req: NextRequest) {
                     if(token.children[k].type === 'text') {
                         linkText += token.children[k].content;
                     }
-                    // Could handle nested styling within links here if necessary
                     k++;
                 }
                 textRunOptions.text = linkText || href;
-                textRunOptions.style = "Hyperlink";
-                
+                textRunOptions.style = "Hyperlink"; // Character style
+
                 if (k < token.children.length) token.children.splice(token.children.indexOf(child) + 1, k - (token.children.indexOf(child)));
 
               } else if (child.type === 'softbreak' || child.type === 'hardbreak') {
                 textRunOptions.break = 1;
               }
-              
+
               if(textRunOptions.text || textRunOptions.break){
-                currentParagraphRuns.push(new TextRun(textRunOptions));
+                // Ensure explicit font for Hyperlink style character runs if needed, though DefaultParagraphFont should pick it up
+                if (textRunOptions.style === "Hyperlink") {
+                     currentParagraphRuns.push(new TextRun({...textRunOptions, font: "Times New Roman", size: 24}));
+                } else {
+                     currentParagraphRuns.push(new TextRun(textRunOptions));
+                }
               }
             }
           }
@@ -197,54 +196,47 @@ export async function POST(req: NextRequest) {
         case 'bullet_list_open':
           flushParagraph();
           isInsideList = true;
-          listLevel = 0; 
+          listLevel = 0;
           break;
         case 'bullet_list_close':
-          flushParagraph(); 
+          flushParagraph();
           isInsideList = false;
           break;
         case 'list_item_open':
-          flushParagraph(); 
+          flushParagraph();
           break;
         case 'list_item_close':
-          flushParagraph(); 
+          flushParagraph();
           break;
-        
+
         case 'code_block':
         case 'fence':
           flushParagraph();
           docChildren.push(new Paragraph({
-            children: [new TextRun({ text: token.content, font: { name: 'Courier New' }, size: 20 })], // 10pt
-            style: "CodeBlockStyle", 
-            spacing: { after: 120 }
+            children: [new TextRun({ text: token.content })], // Text will be styled by CodeBlockStyle
+            style: "CodeBlockStyle",
           }));
           break;
-        
+
         case 'blockquote_open':
           flushParagraph();
-          // For blockquotes, a common approach is to apply a style or indent.
-          // The content of the blockquote will be in subsequent paragraph tokens.
-          // We can set a flag or use a specific paragraph style.
-          // For simplicity, we can add an indented paragraph if style is not defined.
-           docChildren.push(new Paragraph({ // Placeholder, real content comes in next paragraph
-             children: [new TextRun({text: "", italics: true})],
-             indent: {left: 720},
-             style: "BlockquoteStyle"
-           }));
+          isInsideBlockquote = true;
           break;
         case 'blockquote_close':
           flushParagraph();
+          isInsideBlockquote = false;
           break;
-          
+
         case 'hr':
           flushParagraph();
           docChildren.push(new Paragraph({
-            children: [new TextRun("___________________________")], // Simple HR representation
+            children: [new TextRun("___________________________")],
+            style: "Normal",
             alignment: AlignmentType.CENTER,
             spacing: { before: 240, after: 240 }
           }));
           break;
-        
+
         case 'table_open':
           flushParagraph();
           inTable = true;
@@ -270,7 +262,7 @@ export async function POST(req: NextRequest) {
           break;
         case 'thead_open':
         case 'tbody_open':
-          break; // markdown-it structure, docx builds rows directly
+          break;
         case 'thead_close':
         case 'tbody_close':
           break;
@@ -284,61 +276,187 @@ export async function POST(req: NextRequest) {
             }));
           }
           break;
-        case 'th_open': // Treat th like td for simplicity here
+        case 'th_open':
         case 'td_open':
-          // Content for td/th will be in subsequent paragraph_open/inline/paragraph_close tokens
-          // We need to collect these into Paragraph objects for the TableCell.
-          // This requires a more complex state management or parsing ahead.
-          // For a simpler approach, we'll assume text content is directly available or handle in 'inline'.
-          // Let's assume content is collected into currentParagraphRuns and then pushed to currentRowCells
-          flushParagraph(); // Flush anything before cell content
-          currentParagraphRuns = []; // Start fresh for cell content
+          flushParagraph();
+          currentParagraphRuns = [];
           break;
         case 'th_close':
         case 'td_close':
-          flushParagraph(); // Ensure cell content is captured as a paragraph
-          // The flushed paragraph(s) need to be added to currentRowCells
-          // This part is tricky if multiple paragraphs are in one cell.
-          // For now, let's assume one paragraph per cell based on currentParagraphRuns
+          flushParagraph(); // This will create paragraph with "Normal" style by default
           if (docChildren.length > 0 && docChildren[docChildren.length -1] instanceof Paragraph) {
-             const cellPara = docChildren.pop() as Paragraph; // take the last paragraph generated
+             const cellPara = docChildren.pop() as Paragraph;
              currentRowCells.push([cellPara]);
-          } else if (currentParagraphRuns.length > 0) { // Fallback if no paragraph was pushed to docChildren
-             currentRowCells.push([new Paragraph({children: [...currentParagraphRuns]})]);
+          } else if (currentParagraphRuns.length > 0) {
+             currentRowCells.push([new Paragraph({children: [...currentParagraphRuns], style: "Normal"})]);
              currentParagraphRuns = [];
           } else {
-             currentRowCells.push([new Paragraph("")]); // Empty cell
+             currentRowCells.push([new Paragraph({text: "", style: "Normal"})]);
           }
-          currentParagraphRuns = []; // Reset for next element outside cell
+          currentParagraphRuns = [];
           break;
       }
     }
-    flushParagraph(); 
+    flushParagraph();
 
     const doc = new Document({
       sections: [{ children: docChildren }],
       styles: {
+        default: { // Document defaults
+          paragraph: {
+            run: { font: "Times New Roman", size: 24 }, // 12pt
+            spacing: { line: 360, after: 120 }, // 1.5 line spacing (12pt * 1.5 * 20 = 360), 6pt after
+            alignment: AlignmentType.JUSTIFIED,
+          },
+        },
         paragraphStyles: [
-          { id: "Normal", name: "Normal", run: { font: "Times New Roman", size: 24 }, paragraph: { alignment: AlignmentType.JUSTIFIED, spacing: { line: 360, after: 120 }}},
-          { id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", quickFormat: true, run: { size: 32, bold: true, font: "Times New Roman" }, paragraph: { alignment: AlignmentType.CENTER, spacing: { before: 240, after: 120 }}},
-          { id: "Heading2", name: "Heading 2", basedOn: "Normal", next: "Normal", quickFormat: true, run: { size: 28, bold: true, font: "Times New Roman" }, paragraph: { spacing: { before: 240, after: 120 }}},
-          { id: "Heading3", name: "Heading 3", basedOn: "Normal", next: "Normal", quickFormat: true, run: { size: 24, bold: true, font: "Times New Roman" }, paragraph: { spacing: { before: 120, after: 60 }}},
-          { id: "CodeBlockStyle", name: "Code Block Style", basedOn: "Normal", run: { font: "Courier New", size: 20 }, paragraph: { alignment: AlignmentType.LEFT, spacing: { line: 240, after: 120 }, sharding: {fill: "F0F0F0"} } }, // Added shading
-          { id: "BlockquoteStyle", name: "Blockquote Style", basedOn: "Normal", run: { italics: true, color: "595959" }, paragraph: { indent: {left: 720}, spacing: {before: 60, after: 60} }},
+          {
+            id: "Normal",
+            name: "Normal",
+            basedOn: "Normal", // Based on document default
+            quickFormat: true,
+            run: { font: "Times New Roman", size: 24 },
+            paragraph: {
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: { line: 360, after: 120 },
+            },
+          },
+          {
+            id: "Heading1",
+            name: "Heading 1",
+            basedOn: "Normal", // Will inherit TNR 12pt
+            next: "Normal",
+            quickFormat: true,
+            run: { bold: true }, // Keep bold, font/size from basedOn or default
+            paragraph: {
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 240, after: 120, line: 360 }, // TNR 12pt, 1.5 line spacing
+            },
+          },
+          {
+            id: "Heading2",
+            name: "Heading 2",
+            basedOn: "Normal",
+            next: "Normal",
+            quickFormat: true,
+            run: { bold: true },
+            paragraph: {
+              alignment: AlignmentType.LEFT,
+              spacing: { before: 240, after: 120, line: 360 },
+            },
+          },
+          {
+            id: "Heading3",
+            name: "Heading 3",
+            basedOn: "Normal",
+            next: "Normal",
+            quickFormat: true,
+            run: { bold: true },
+            paragraph: {
+              alignment: AlignmentType.LEFT,
+              spacing: { before: 120, after: 60, line: 360 },
+            },
+          },
+          {
+            id: "Heading4",
+            name: "Heading 4",
+            basedOn: "Normal",
+            next: "Normal",
+            quickFormat: true,
+            run: { bold: true },
+            paragraph: {
+              alignment: AlignmentType.LEFT,
+              spacing: { before: 120, after: 60, line: 360 },
+            },
+          },
+          {
+            id: "Heading5",
+            name: "Heading 5",
+            basedOn: "Normal",
+            next: "Normal",
+            quickFormat: true,
+            run: { bold: true },
+            paragraph: {
+              alignment: AlignmentType.LEFT,
+              spacing: { before: 120, after: 60, line: 360 },
+            },
+          },
+          {
+            id: "Heading6",
+            name: "Heading 6",
+            basedOn: "Normal",
+            next: "Normal",
+            quickFormat: true,
+            run: { bold: true },
+            paragraph: {
+              alignment: AlignmentType.LEFT,
+              spacing: { before: 120, after: 60, line: 360 },
+            },
+          },
+          {
+            id: "CodeBlockStyle",
+            name: "Code Block Style",
+            basedOn: "Normal", // Inherits TNR 12pt
+            run: {}, // No specific run override, so uses Normal's run
+            paragraph: {
+              alignment: AlignmentType.LEFT, // Not justified for code
+              spacing: { line: 240, after: 120 }, // Single line spacing
+              shading: { type: ShadingType.CLEAR, fill: "F0F0F0" }, // Keep shading
+            },
+          },
+          {
+            id: "BlockquoteStyle",
+            name: "Blockquote Style",
+            basedOn: "Normal", // Inherits TNR 12pt, Justified, 1.5 spacing
+            run: { italics: true }, // Add italics
+            paragraph: {
+              indent: {left: 720}, // Keep indent
+              spacing: { after: 60 }, // Adjust after spacing
+            },
+          },
+          {
+            id: "ImageCaption",
+            name: "Image Caption",
+            basedOn: "Normal", // Inherits TNR 12pt, Justified, 1.5 spacing
+            run: { size: 18, italics: true, font: "Times New Roman" }, // Override to 9pt italic TNR
+            paragraph: {
+              alignment: AlignmentType.CENTER, // Center captions
+              spacing: { line: 240, after: 60 }, // Single line spacing for captions
+            },
+          },
         ],
         characterStyles: [
-            { id: "Hyperlink", name: "Hyperlink", basedOn:"DefaultParagraphFont", run: { color: "0563C1", underline: {}}}
+            {
+              id: "Hyperlink",
+              name: "Hyperlink",
+              basedOn: "DefaultParagraphFont", // Will inherit TNR and 12pt from paragraph's run
+              run: { color: "0563C1", underline: {}, font: "Times New Roman", size: 24 }, // Explicitly set font here too
+            }
         ]
       },
-       numbering: { 
+       numbering: {
         config: [{
           reference: "default-numbering",
           levels: [{
             level: 0, format: "bullet", text: "•", alignment: AlignmentType.LEFT,
-            style: { paragraph: { indent: { left: 720, hanging: 360 } } }
+            style: {
+              paragraph: {
+                indent: { left: 720, hanging: 360 },
+                spacing: { line: 360, after: 60 }, // 1.5 line, 3pt after
+                alignment: AlignmentType.JUSTIFIED,
+                run: { font: "Times New Roman", size: 24 }, // TNR 12pt
+              }
+            }
           },{
             level: 1, format: "bullet", text: "◦", alignment: AlignmentType.LEFT,
-            style: { paragraph: { indent: { left: 1440, hanging: 360 } } }
+            style: {
+              paragraph: {
+                indent: { left: 1440, hanging: 360 },
+                spacing: { line: 360, after: 60 },
+                alignment: AlignmentType.JUSTIFIED,
+                run: { font: "Times New Roman", size: 24 },
+              }
+            }
           }]
         }]
       }
@@ -360,3 +478,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Falha ao gerar o arquivo DOCX.', details: errorMessage }, { status: 500 });
   }
 }
+
+    
