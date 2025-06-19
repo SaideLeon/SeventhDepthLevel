@@ -112,12 +112,12 @@ export default {
         'bubble-pulse': 'bubble-pulse 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },
       typography: ({ theme }: { theme: (path: string) => string }) => ({
-        DEFAULT: {
+        DEFAULT: { // Corresponds to 'prose' or 'prose-base'
           css: {
+            '--tw-prose-font-family': '"Times New Roman", Times, serif',
             '--tw-prose-body': theme('colors.foreground'),
             '--tw-prose-headings': theme('colors.primary.DEFAULT'),
-            '--tw-prose-lead': theme('colors.foreground'),
-            '--tw-prose-links': theme('colors.accent.DEFAULT'),
+            '--tw-prose-links': theme('colors.accent.DEFAULT'), 
             '--tw-prose-bold': theme('colors.foreground'),
             '--tw-prose-counters': theme('colors.muted.foreground'),
             '--tw-prose-bullets': theme('colors.muted.foreground'),
@@ -125,14 +125,175 @@ export default {
             '--tw-prose-quotes': theme('colors.muted.foreground'),
             '--tw-prose-quote-borders': theme('colors.muted.DEFAULT'),
             '--tw-prose-captions': theme('colors.muted.foreground'),
-            '--tw-prose-code': theme('colors.foreground'), // For inline code text color
-            '--tw-prose-pre-code': 'inherit', // Let VSCodeCodeBlock handle this
-            '--tw-prose-pre-bg': 'transparent', // Let VSCodeCodeBlock handle this
+            '--tw-prose-code': theme('colors.foreground'), 
+            '--tw-prose-pre-code': 'inherit', 
+            '--tw-prose-pre-bg': 'transparent', 
             '--tw-prose-th-borders': theme('colors.border'),
             '--tw-prose-td-borders': theme('colors.border'),
+
+            color: 'var(--tw-prose-body)',
+            fontFamily: 'var(--tw-prose-font-family)',
+            fontSize: '1rem', // 12pt (16px)
+            lineHeight: '1.5',
+            textAlign: 'justify',
+
+            p: {
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              lineHeight: 'inherit',
+              textAlign: 'justify',
+              marginTop: '0.75em',
+              marginBottom: '0.75em',
+            },
+
+            'h1, h2, h3, h4, h5, h6': {
+              fontFamily: 'inherit',
+              color: 'var(--tw-prose-headings)',
+              fontWeight: '600',
+              fontSize: '1em', // All headings 12pt (1em of 1rem)
+              lineHeight: '1.5',
+              textAlign: 'left',
+              marginTop: '1.2em',
+              marginBottom: '0.6em',
+            },
+            h1: {
+              textAlign: 'center',
+              // fontSize: '1.25em', // Optional: slightly larger H1 while keeping base 12pt
+            },
+
+            'ul, ol': {
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              lineHeight: 'inherit',
+              textAlign: 'justify',
+              marginTop: '0.75em',
+              marginBottom: '0.75em',
+              paddingLeft: '1.6em',
+            },
+            li: {
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              lineHeight: 'inherit',
+              textAlign: 'justify',
+              marginTop: '0.25em',
+              marginBottom: '0.25em',
+            },
+            'ul > li::before': {
+              backgroundColor: 'var(--tw-prose-bullets)',
+            },
+            'ol > li::before': {
+              color: 'var(--tw-prose-counters)',
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+            },
+
+            blockquote: {
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              lineHeight: 'inherit',
+              textAlign: 'justify',
+              fontStyle: 'italic',
+              color: 'var(--tw-prose-quotes)',
+              borderLeftColor: 'var(--tw-prose-quote-borders)',
+              borderLeftWidth: '0.25em',
+              paddingLeft: '1em',
+              marginLeft: '0',
+              marginRight: '0',
+              marginTop: '1em',
+              marginBottom: '1em',
+            },
+
+            code: { // Inline code
+              fontFamily: 'var(--tw-prose-font-family)', 
+              color: 'var(--tw-prose-code)',
+              fontSize: '0.9em', 
+              lineHeight: '1.3', 
+              fontWeight: '400',
+              backgroundColor: theme('colors.muted'),
+              padding: '0.1em 0.3em',
+              borderRadius: '0.2em',
+              wordBreak: 'break-all',
+            },
+            'pre code': { // Code inside VSCodeCodeBlock
+              fontFamily: 'var(--tw-prose-font-family) !important', 
+              fontSize: '0.9em !important',       
+              lineHeight: '1.4 !important',       
+              color: 'inherit', 
+              backgroundColor: 'transparent', 
+              padding: '0',
+            },
+            pre: { // Wrapper for VSCodeCodeBlock
+              fontFamily: 'var(--tw-prose-font-family) !important', 
+              fontSize: '0.9em !important',
+              lineHeight: '1.4 !important',
+              marginTop: '1em',
+              marginBottom: '1em',
+              borderRadius: theme('borderRadius.md'),
+            },
+
+            a: {
+              fontFamily: 'inherit',
+              color: 'var(--tw-prose-links)',
+              textDecoration: 'underline',
+              fontWeight: '400',
+            },
+            strong: {
+              fontFamily: 'inherit',
+              color: 'var(--tw-prose-bold)',
+              fontWeight: '700',
+            },
+            em: {
+              fontFamily: 'inherit',
+              fontStyle: 'italic',
+              color: 'inherit',
+            },
+            hr: {
+              borderColor: 'var(--tw-prose-hr)',
+              marginTop: '2em',
+              marginBottom: '2em',
+            },
+            img: {
+              marginTop: '1.5em',
+              marginBottom: '1.5em',
+            },
+            table: {
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              lineHeight: 'inherit',
+              textAlign: 'left',
+              width: '100%',
+              marginTop: '1.5em',
+              marginBottom: '1.5em',
+            },
+            thead: {
+              fontFamily: 'inherit',
+              borderBottomWidth: '1px',
+              borderBottomColor: 'var(--tw-prose-th-borders)',
+            },
+            'thead th': {
+              fontFamily: 'inherit',
+              color: 'var(--tw-prose-headings)',
+              fontWeight: '600',
+              padding: '0.5em',
+              textAlign: 'left',
+            },
+            'tbody tr': {
+              fontFamily: 'inherit',
+              borderBottomWidth: '1px',
+              borderBottomColor: 'var(--tw-prose-td-borders)',
+            },
+            'tbody tr:last-child': {
+              borderBottomWidth: '0',
+            },
+            'tbody td': {
+              fontFamily: 'inherit',
+              padding: '0.5em',
+            },
+
+            // Invert variants for dark mode
+            '--tw-prose-invert-font-family': 'var(--tw-prose-font-family)',
             '--tw-prose-invert-body': theme('colors.foreground'),
             '--tw-prose-invert-headings': theme('colors.primary.DEFAULT'),
-            '--tw-prose-invert-lead': theme('colors.foreground'),
             '--tw-prose-invert-links': theme('colors.accent.DEFAULT'),
             '--tw-prose-invert-bold': theme('colors.foreground'),
             '--tw-prose-invert-counters': theme('colors.muted.foreground'),
@@ -146,12 +307,8 @@ export default {
             '--tw-prose-invert-pre-bg': 'transparent',
             '--tw-prose-invert-th-borders': theme('colors.border'),
             '--tw-prose-invert-td-borders': theme('colors.border'),
-            p: { marginTop: '0.5em', marginBottom: '0.5em' },
-            li: { marginTop: '0.1em', marginBottom: '0.1em' },
-            'ul > li::before': { backgroundColor: theme('colors.muted.foreground') },
-            'ol > li::before': { color: theme('colors.muted.foreground') },
-          },
-        },
+          }
+        }
       }),
     },
   },

@@ -85,43 +85,70 @@
 
   /* Markdown specific styles */
   .markdown-container {
-    @apply prose prose-sm dark:prose-invert max-w-none;
+    @apply prose dark:prose-invert max-w-none; /* Uses 'prose' (base) not 'prose-sm' */
   }
+
+  /* Ensure text justification for relevant elements within markdown if not covered by prose config */
+  .markdown-container p,
+  .markdown-container li,
+  .markdown-container blockquote {
+    @apply text-justify;
+  }
+
+  .markdown-container h1 { @apply text-center; } /* H1 centered */
+  .markdown-container h2,
+  .markdown-container h3,
+  .markdown-container h4,
+  .markdown-container h5,
+  .markdown-container h6 {
+    @apply text-left; /* Other headings left-aligned */
+  }
+
+  /* Overrides for specific elements within .markdown-container if needed */
   .markdown-container h1,
   .markdown-container h2,
   .markdown-container h3,
   .markdown-container h4,
   .markdown-container h5,
   .markdown-container h6 {
-    @apply font-headline text-foreground;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 1rem; /* 12pt */
+    line-height: 1.5;
+    /* color already set by prose config */
   }
   .markdown-container p {
-    @apply text-foreground my-2; /* Reduced margin for chat context */
+    font-family: "Times New Roman", Times, serif;
+    font-size: 1rem; /* 12pt */
+    line-height: 1.5;
+     /* color and text-align already set by prose config */
   }
   .markdown-container a {
-    @apply text-accent hover:underline;
+    font-family: "Times New Roman", Times, serif;
+    /* color, text-decoration already set by prose config */
   }
   .markdown-container ul,
-  .markdown-container ol {
-    @apply text-foreground list-inside my-2 pl-4;
-  }
+  .markdown-container ol,
   .markdown-container li {
-    @apply my-0.5; /* Reduced margin for list items */
+    font-family: "Times New Roman", Times, serif;
+    font-size: 1rem; /* 12pt */
+    line-height: 1.5;
+    /* color and text-align already set by prose config */
   }
   .markdown-container blockquote {
-    @apply border-l-4 border-muted pl-4 italic text-muted-foreground my-2;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 1rem; /* 12pt */
+    line-height: 1.5;
+    /* color, border, padding already set by prose config */
   }
   .markdown-container hr {
-    @apply border-border my-4;
+    /* border already set by prose config */
   }
-  /* Inline code is handled by VSCodeCodeBlock component for consistency or custom span style */
-  .markdown-container code:not(pre > code) { /* Style for inline code */
-    @apply bg-muted text-muted-foreground px-1.5 py-0.5 rounded-sm font-mono text-xs mx-0.5;
-  }
-  /* Fenced code blocks are handled by VSCodeCodeBlock component */
+  /* Inline code is styled by prose config (tailwindcss.config.ts) */
+  /* Fenced code blocks (VSCodeCodeBlock) are styled by prose config (tailwindcss.config.ts) */
   .markdown-container pre {
-    @apply my-3; /* Keep some margin for VSCodeCodeBlock */
+    /* Most styling for pre is handled by VSCodeCodeBlock and prose config */
   }
 
 }
+
 
