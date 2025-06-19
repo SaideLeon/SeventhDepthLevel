@@ -46,6 +46,14 @@ export async function generateAcademicSection(input: GenerateAcademicSectionInpu
   return generateAcademicSectionFlow(input);
 }
 
+// Register Handlebars helper at the module level
+ai.registry.addHandlebarsHelper('substring', function (str: string, start: number, end: number) {
+  if (typeof str === 'string') {
+    return str.substring(start, end);
+  }
+  return '';
+});
+
 const academicSectionPrompt = ai.definePrompt({
   name: 'generateAcademicSectionPrompt',
   input: {schema: GenerateAcademicSectionInputSchema},
@@ -111,14 +119,6 @@ const generateAcademicSectionFlow = ai.defineFlow(
     outputSchema: GenerateAcademicSectionOutputSchema,
   },
   async (input) => {
-    // Helper for Handlebars to allow substring
-    ai.registry.addHandlebarsHelper('substring', function (str: string, start: number, end: number) {
-      if (typeof str === 'string') {
-        return str.substring(start, end);
-      }
-      return '';
-    });
-
     const {output} = await academicSectionPrompt(input);
     if (!output || !output.sectionContent) {
       throw new Error('AI model did not produce valid section content.');
