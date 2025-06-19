@@ -40,7 +40,7 @@ const GenerateAcademicResponseInputSchema = z.object({
   persona: z.string().optional().default("Cognick, seu assistente de estudos").describe('The persona the AI should adopt.'),
   rules: z.string().optional().describe('Specific rules the AI should follow when responding.'),
   contextContent: z.string().optional().describe('Additional context, which could be formatted fichas de leitura, previously written sections, or web scraping results, to help answer the prompt.'),
-  imageInfo: z.string().optional().describe('Information about images found during web scraping, if any (e.g., list of image URLs or descriptions in the format "alt text (URL)").'),
+  imageInfo: z.string().optional().describe('Information about images found during web scraping, if any (e.g., list of image URLs or descriptions in the format "alt text (URL)"). This is used for sections other than intro/conclusion.'),
   conversationHistory: z.array(MessageSchema).optional().describe('The recent history of the conversation, to provide context. User\'s current query is separate in "prompt". Ordered from oldest to newest relevant message.'),
   targetLanguage: z.string().optional().default('pt-BR').describe('The language for the response.'),
   citationStyle: z.string().optional().default('APA').describe('The citation style to follow (e.g., APA, ABNT, MLA).'),
@@ -91,8 +91,8 @@ A saída deve ser formatada em Markdown.
 Ao gerar o texto, por favor, siga estas etapas meticulosamente:
 1.  **Estrutura e Cabeçalhos**: Estruture o texto acadêmico com cabeçalhos claros e relevantes (ex: # Título da Seção, ## Subseção, etc.) somente se apropriado para a seção E SE O PROMPT ATUAL PEDIR UM CABEÇALHO. Use a sintaxe Markdown para cabeçalhos. Se estiver gerando apenas o conteúdo de UMA seção, não repita o título da seção no início do conteúdo.
 2.  **Desenvolvimento do Conteúdo**: Para o(s) cabeçalho(s) que você criar ou identificar, assegure que o conteúdo abaixo dele seja completamente desenvolvido e expandido. Forneça explicações detalhadas, exemplos, argumentos e detalhes de suporte conforme apropriado para um trabalho acadêmico e de acordo com o prompt atual.
-3.  **Colocação e Formatação de Imagens - INSTRUÇÕES CRÍTICAS**:
-    a.  **Colocação Contextual**: Se imagens forem fornecidas no contexto (via \`imageInfo\` OU dentro do \`contextContent\` que representa fichas de leitura), e você determinar que uma imagem é diretamente relevante para um cabeçalho ou subcabeçalho específico que você está gerando, você **DEVE** inserir essa imagem usando o formato Markdown (\`![texto alternativo](URL)\`) imediatamente **ABAIXO** desse cabeçalho relevante.
+3.  **Colocação e Formatação de Imagens - INSTRUÇÕES CRÍTICAS (APENAS PARA SEÇÕES DE DESENVOLVIMENTO, NÃO PARA INTRODUÇÃO/CONCLUSÃO)**:
+    a.  **Condição**: Se estiver desenvolvendo uma seção principal (NÃO uma introdução ou conclusão) e se imagens forem fornecidas no contexto (via \`imageInfo\` OU dentro do \`contextContent\` que representa fichas de leitura), e você determinar que uma imagem é diretamente relevante para um cabeçalho ou subcabeçalho específico que você está gerando, você **DEVE** inserir essa imagem usando o formato Markdown (\`![texto alternativo](URL)\`) imediatamente **ABAIXO** desse cabeçalho relevante.
     b.  **Texto Alternativo**: Use a legenda original da imagem (disponível na string \`imageInfo\` ou na ficha de leitura) como o texto alternativo no Markdown.
     c.  **Formatação de URL - ABSOLUTAMENTE CRÍTICO**: Para TODAS as imagens, você **DEVE** garantir que nenhum parâmetro de URL (como '?width=50&blur=10', '?size=small', etc.) seja incluído na URL de origem da imagem dentro do Markdown. SEMPRE use apenas a URL base da imagem.
 4.  **Estilo de Citação - INSTRUÇÃO CRÍTICA: VOCÊ DEVE PRIORIZAR CITAÇÕES NARRATIVAS.**
@@ -112,11 +112,12 @@ Use as seguintes informações de contexto (podem ser fichas de leitura, conteú
 Esta informação deve ser priorizada. Incorpore-a naturalmente em sua resposta, seguindo todas as diretrizes de formatação e citação.
 Contexto:
 {{{contextContent}}}
+---
+{{/if}}
 
 {{#if imageInfo}}
-A pesquisa também encontrou a(s) seguinte(s) imagem(ns) que podem ser relevantes. Consulte \`imageInfo\` para detalhes.
+As seguintes informações sobre imagens foram fornecidas. Se estiver escrevendo uma seção de DESENVOLVIMENTO (não introdução/conclusão), considere incorporá-las contextualmente conforme as instruções:
 {{{imageInfo}}}
-{{/if}}
 ---
 {{/if}}
 
@@ -125,6 +126,7 @@ O usuário também forneceu a seguinte imagem diretamente com sua pergunta atual
 {{media url=userImageInputDataUri}}
 ---
 {{/if}}
+
 Tarefa/prompt atual do usuário: {{{prompt}}}
 
 Responda APENAS com o texto Markdown solicitado. Não adicione comentários ou explicações sobre o que você está fazendo, a menos que o prompt peça explicitamente.
@@ -162,5 +164,4 @@ const generateAcademicResponseFlow = ai.defineFlow(
     return output as GenerateAcademicResponseOutput;
   }
 );
-
     
