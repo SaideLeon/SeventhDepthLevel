@@ -50,9 +50,15 @@ A introdução deve:
 3.  Declarar claramente o objetivo geral do trabalho.
 4.  Descrever brevemente a estrutura do trabalho, mencionando as principais seções que serão desenvolvidas (baseado no generatedIndex, se fornecido, ou em uma estrutura lógica típica).
 5.  Ser escrita em tom formal e acadêmico.
-6.  Ter entre 200 e 400 palavras.
+6.  Ter aproximadamente 200-300 palavras.
 
-Responda apenas com o texto da introdução em formato Markdown. Não inclua o título "Introdução" no início do texto gerado, pois ele já será um título de seção.
+A sua resposta DEVE ser um objeto JSON com uma única chave "introduction". O valor dessa chave será o texto da introdução em formato Markdown.
+Não inclua o título "Introdução" dentro do valor do campo "introduction", pois ele já será um título de seção no documento final.
+
+Exemplo de formato de saída JSON esperado:
+{
+  "introduction": "Este é o texto da introdução que contextualiza o tema X, aborda sua relevância e descreve as seções subsequentes do trabalho..."
+}
 `,
 });
 
@@ -64,8 +70,8 @@ const generateIntroductionFlow = ai.defineFlow(
   },
   async (input) => {
     const {output} = await introductionPrompt(input);
-    if (!output || !output.introduction) {
-      throw new Error('AI model did not produce a valid introduction.');
+    if (!output || typeof output.introduction !== 'string') {
+      throw new Error('AI model did not produce a valid introduction in the expected format.');
     }
     return output;
   }

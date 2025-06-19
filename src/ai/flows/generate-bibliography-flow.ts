@@ -69,12 +69,15 @@ Instruções para a Bibliografia:
 - Liste as referências em ordem alfabética pelo sobrenome do primeiro autor (ou pelo título, se não houver autor).
 - Cada referência deve ser um item de uma lista não ordenada em Markdown (usando '* ').
 
-Exemplo de formato de saída (estilo APA simplificado):
-*   Autor, A. A. (Ano). *Título do trabalho*. URL
-*   Nome da Organização. (Ano). *Título do trabalho*. URL
-*   *Título do trabalho quando não há autor*. (Ano). URL
+A sua resposta DEVE ser um objeto JSON com uma única chave "bibliography". O valor dessa chave será a lista de referências em formato Markdown.
+Não inclua o título "Referências Bibliográficas" ou "Bibliografia" dentro do valor do campo "bibliography".
 
-Responda apenas com a lista de referências em formato Markdown. Não inclua o título "Referências Bibliográficas" ou "Bibliografia" no início do texto gerado.
+Exemplo de formato de saída JSON esperado (para estilo APA simplificado):
+{
+  "bibliography": "* Autor, A. A. (Ano). *Título do trabalho*. URL\\n* Nome da Organização. (Ano). *Título do trabalho*. URL\\n* *Título do trabalho quando não há autor*. (Ano). URL"
+}
+
+(Note que no exemplo JSON acima, \\n representa novas linhas no Markdown gerado.)
 `,
 });
 
@@ -89,8 +92,8 @@ const generateBibliographyFlow = ai.defineFlow(
       return { bibliography: "Nenhuma fonte fornecida para gerar a bibliografia." };
     }
     const {output} = await bibliographyPrompt(input);
-    if (!output || !output.bibliography) {
-      throw new Error('AI model did not produce a valid bibliography.');
+    if (!output || typeof output.bibliography !== 'string') {
+      throw new Error('AI model did not produce a valid bibliography in the expected format.');
     }
     return output;
   }

@@ -108,7 +108,12 @@ Instruções para a Seção "{{sectionTitle}}":
 - Organize o conteúdo para que flua bem e cubra os aspectos principais sugeridos pelo título da seção "{{sectionTitle}}" dentro do contexto do tema "{{mainTopic}}".
 - NÃO inclua o título da seção ("{{sectionTitle}}") no início do conteúdo gerado, pois ele já será o título da seção.
 
-Responda apenas com o conteúdo da seção em formato Markdown.
+A sua resposta DEVE ser um objeto JSON com uma única chave "sectionContent". O valor dessa chave será o conteúdo da seção em formato Markdown.
+
+Exemplo de formato de saída JSON esperado:
+{
+  "sectionContent": "Este é o conteúdo desenvolvido para a seção. Ele aborda os pontos principais de acordo com as fichas e o tema..."
+}
 `,
 });
 
@@ -120,8 +125,8 @@ const generateAcademicSectionFlow = ai.defineFlow(
   },
   async (input) => {
     const {output} = await academicSectionPrompt(input);
-    if (!output || !output.sectionContent) {
-      throw new Error('AI model did not produce valid section content.');
+    if (!output || typeof output.sectionContent !== 'string') {
+      throw new Error('AI model did not produce valid section content in the expected format.');
     }
     return output;
   }

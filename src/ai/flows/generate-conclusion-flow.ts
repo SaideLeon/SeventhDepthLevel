@@ -64,9 +64,15 @@ A conclusão deve:
 3.  Apresentar reflexões finais sobre o tema, com base no que foi exposto.
 4.  Pode (opcionalmente) indicar limitações do estudo ou sugerir caminhos para pesquisas futuras.
 5.  Ser escrita em tom formal e acadêmico.
-6.  Ter entre 200 e 400 palavras.
+6.  Ter aproximadamente 200-300 palavras.
 
-Responda apenas com o texto da conclusão em formato Markdown. Não inclua o título "Conclusão" no início do texto gerado.
+A sua resposta DEVE ser um objeto JSON com uma única chave "conclusion". O valor dessa chave será o texto da conclusão em formato Markdown.
+Não inclua o título "Conclusão" dentro do valor do campo "conclusion".
+
+Exemplo de formato de saída JSON esperado:
+{
+  "conclusion": "Em suma, este trabalho explorou o tema X, recapitulando os principais achados e oferecendo reflexões finais..."
+}
 `,
 });
 
@@ -78,8 +84,8 @@ const generateConclusionFlow = ai.defineFlow(
   },
   async (input) => {
     const {output} = await conclusionPrompt(input);
-    if (!output || !output.conclusion) {
-      throw new Error('AI model did not produce a valid conclusion.');
+    if (!output || typeof output.conclusion !== 'string') {
+      throw new Error('AI model did not produce a valid conclusion in the expected format.');
     }
     return output;
   }
