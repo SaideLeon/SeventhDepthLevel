@@ -3,17 +3,16 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input as ShadInput } from '@/components/ui/input'; 
+import { Input as ShadInput } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from "@/components/ui/progress";
-import { Loader2, SendHorizontal, Sparkles, BookCheck, FileText as FileTextLucideIcon } from 'lucide-react'; 
+import { Loader2, SendHorizontal, Sparkles, BookCheck, FileText as FileTextLucideIcon } from 'lucide-react';
 import MarkdownToDocx from '@/components/MarkdownToDocx';
 import { useToast } from "@/hooks/use-toast";
 import { MarkdownWithCode } from '@/components/Markdown/MarkdownWithCode';
-import type { SearchResult, PageContent, ImagemConteudo } from "@/utils/raspagem"; 
+import type { SearchResult, PageContent, ImagemConteudo } from "@/utils/raspagem";
 import type { DetectTopicFromTextOutput } from "@/ai/flows/detect-topic-flow";
-// import type { FichaLeitura as GenkitFichaLeitura } from "@/ai/flows/generate-fichamento-flow"; // No longer used
-import type { FichaLeitura } from "@/types"; // Main FichaLeitura from Groq
+import type { FichaLeitura } from "@/types";
 import type { GenerateIndexOutput } from "@/ai/flows/generate-index-flow";
 import type { GenerateBibliographyOutput } from "@/ai/flows/generate-bibliography-flow";
 import type { GenerateAcademicResponseOutput } from '@/ai/flows/generate-academic-response-flow';
@@ -33,7 +32,7 @@ export interface AcademicWork {
   fullGeneratedText?: string;
   createdAt: number;
   lastUpdatedAt: number;
-  fichas?: FichaLeitura[]; 
+  fichas?: FichaLeitura[];
   generatedIndex?: string[];
   researchLog?: string[];
   writingLog?: string[];
@@ -66,11 +65,11 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
   const [researchProgress, setResearchProgress] = useState(0);
   const [researchCurrentStep, setResearchCurrentStep] = useState(0);
   const [researchTotalSteps, setResearchTotalSteps] = useState(0);
-  
+
   const [isWriting, setIsWriting] = useState(false);
   const [writingProgress, setWritingProgress] = useState(0);
   const [writingCurrentLogItem, setWritingCurrentLogItem] = useState("");
-  
+
   const [currentDetectedTopic, setCurrentDetectedTopic] = useState<string | null>(null);
   const [researchedFichas, setResearchedFichas] = useState<FichaLeitura[]>([]);
   const [generatedIndex, setGeneratedIndex] = useState<string[]>([]);
@@ -111,13 +110,11 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
   useEffect(() => {
     if (activeWork) {
       if (!isLoading && !startFichamentoChain && !startWritingChain && !fichamentoCompleted) {
-         // Não preencher workThemeInput automaticamente para permitir que o usuário inicie com campo limpo,
-         // a menos que o activeWork.theme exista e o input esteja vazio (para carregar trabalhos existentes).
         if (activeWork.theme && workThemeInput === '') {
           // setWorkThemeInput(activeWork.theme); // Comentado para priorizar input do usuário
         }
       }
-      
+
       setResearchedFichas(activeWork.fichas || []);
       setGeneratedFullText(activeWork.fullGeneratedText || null);
       setGeneratedIndex(activeWork.generatedIndex || []);
@@ -125,7 +122,7 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
       setResearchLog(activeWork.researchLog || []);
       setWritingLog(activeWork.writingLog || []);
       setCurrentDetectedTopic(activeWork.detectedTopic || null);
-      
+
       const currentWorkIdInDataAttr = (workAreaRef.current as HTMLDivElement & { dataset: { currentWorkId?: string } })?.dataset?.currentWorkId;
       if (activeWork.id !== currentWorkIdInDataAttr) {
         setIsResearching(false);
@@ -206,14 +203,14 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
         tempAddResearchLog(`✅ Tópico detectado para pesquisa: "${effectiveSearchTopic}"`);
       } else {
         tempAddResearchLog(`⚠️ Não foi possível refinar o tópico. Usando o tema original: "${effectiveSearchTopic}"`);
-        setCurrentDetectedTopic(effectiveSearchTopic); 
+        setCurrentDetectedTopic(effectiveSearchTopic);
       }
     } catch (error: any) {
       tempAddResearchLog(`❌ Erro ao detectar tópico: ${error.message}. Usando tema original.`);
-      setCurrentDetectedTopic(effectiveSearchTopic); 
+      setCurrentDetectedTopic(effectiveSearchTopic);
     }
     setResearchProgress(10);
-    if (activeWork) { 
+    if (activeWork) {
         onUpdateWork({ ...activeWork, detectedTopic: effectiveSearchTopic, theme: themeForResearch, title: activeWork.title || themeForResearch, researchLog: currentResearchLogs, lastUpdatedAt: Date.now() });
     }
 
@@ -223,20 +220,20 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
       const scraperSearchResponse = await fetch('/api/raspagem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ termoBusca: effectiveSearchTopic, todasPaginas: true, maxPaginas: 3 }), 
+        body: JSON.stringify({ termoBusca: effectiveSearchTopic, todasPaginas: true, maxPaginas: 3 }),
       });
       if (!scraperSearchResponse.ok) {
          const errorData = await scraperSearchResponse.json().catch(() => ({}));
         throw new Error(`Falha ao buscar artigos: ${errorData.error || scraperSearchResponse.statusText}`);
       }
       const allSearchResults: SearchResult[] = await scraperSearchResponse.json();
-      searchResults = allSearchResults.slice(0, 10); 
+      searchResults = allSearchResults.slice(0, 10);
       tempAddResearchLog(`🔗 ${searchResults.length} artigos encontrados para processamento.`);
       if (searchResults.length === 0) {
         tempAddResearchLog('Nenhum artigo encontrado. Tente um tema diferente.');
         setIsResearching(false);
         setResearchProgress(100);
-        setFichamentoCompleted(true); 
+        setFichamentoCompleted(true);
         if (activeWork) onUpdateWork({ ...activeWork, researchLog: currentResearchLogs, fichas: [], lastUpdatedAt: Date.now() });
         return;
       }
@@ -254,7 +251,7 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
     for (let i = 0; i < searchResults.length; i++) {
       const article = searchResults[i];
       setResearchCurrentStep(i + 1);
-      const currentProgressStep = 20 + ((i + 1) / searchResults.length) * 70; 
+      const currentProgressStep = 20 + ((i + 1) / searchResults.length) * 70;
       setResearchProgress(currentProgressStep);
       tempAddResearchLog(`📄 Processando artigo ${i + 1}/${searchResults.length}: "${article.titulo.substring(0,50)}..."`);
 
@@ -275,7 +272,7 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
         }
 
         tempAddResearchLog(`⚙️ Gerando ficha para "${pageContent.titulo || article.titulo}" (Usando Groq)...`);
-        
+
         const fichamentoInputAPIBody = {
           conteudo: pageContent, // pageContent is ConteudoRaspado
         };
@@ -291,18 +288,18 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
             throw new Error(`Falha ao gerar ficha (Groq): ${errorData.details || errorData.error || fichamentoResponse.statusText}`);
         }
         const fichaGerada: FichaLeitura = await fichamentoResponse.json();
-        
+
         fetchedFichas.push(fichaGerada);
-        setResearchedFichas(prev => [...prev, fichaGerada]); 
+        setResearchedFichas(prev => [...prev, fichaGerada]);
         tempAddResearchLog(`✅ Ficha (Groq) para "${fichaGerada.titulo.substring(0,50)}..." criada.`);
 
       } catch (error: any) {
         tempAddResearchLog(`❌ Erro ao processar artigo "${article.titulo.substring(0,50)}...": ${error.message}`);
       }
     }
-    
+
     tempAddResearchLog(`📚 Fichamento (Groq) concluído. ${fetchedFichas.length} fichas geradas.`);
-    if (activeWork) { 
+    if (activeWork) {
         onUpdateWork({ ...activeWork, fichas: fetchedFichas, researchLog: currentResearchLogs, lastUpdatedAt: Date.now() });
     }
     setResearchProgress(100);
@@ -325,12 +322,12 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
         setIsWriting(false);
         return;
     }
-    
+
     setIsWriting(true);
     let currentWritingLogs = [`${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit'})}: Iniciando desenvolvimento do trabalho: "${activeWork.title || finalThemeForWriting}"`];
     setWritingLog(currentWritingLogs);
     setWritingProgress(0);
-    
+
     const tempAddWritingLog = (message: string) => {
         const logMessage = `${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit'})}: ${message}`;
         console.log(`[Desenvolvimento Temp]: ${message}`);
@@ -372,15 +369,15 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
         onUpdateWork({ ...activeWork, generatedIndex: tempGeneratedIndexTitles, writingLog: currentWritingLogs, lastUpdatedAt: Date.now() });
     }
 
-    let tempFullText = `# ${activeWork.title || finalThemeForWriting}\n\n`; // Main title for the whole document
-    const tempDevelopedSections: AcademicWorkSection[] = developedSections.length > 0 ? [...developedSections] : []; 
+    let tempFullText = ""; // Não adicionar o título principal aqui
+    const tempDevelopedSections: AcademicWorkSection[] = developedSections.length > 0 ? [...developedSections] : [];
 
     for (let i = 0; i < tempGeneratedIndexTitles.length; i++) {
         const sectionTitle = tempGeneratedIndexTitles[i];
         const currentProgressStep = 10 + ((i + 1) / tempGeneratedIndexTitles.length) * 85;
         setWritingProgress(currentProgressStep);
         tempAddWritingLog(`✍️ Escrevendo seção ${i+1}/${tempGeneratedIndexTitles.length}: "${sectionTitle}"...`);
-        
+
         let sectionContent = "";
         try {
             const sectionTitleLower = sectionTitle.toLowerCase();
@@ -391,8 +388,8 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
                     url: f.url,
                     titulo: f.titulo,
                     autor: f.autor,
-                    anoPublicacao: f.anoPublicacao || 's.d.', 
-                    palavrasChave: f.palavrasChave || [], 
+                    anoPublicacao: f.anoPublicacao || 's.d.',
+                    palavrasChave: f.palavrasChave || [],
                 }));
                  apiResponse = await fetch('/api/generate-bibliography', {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -400,13 +397,13 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
                 });
                 if (!apiResponse.ok) { const err = await apiResponse.json(); throw new Error(err.details || err.error || "Erro desconhecido ao gerar bibliografia"); }
                 const result: GenerateBibliographyOutput = await apiResponse.json();
-                sectionContent = result.bibliography;
+                sectionContent = result.bibliography; // IA já inclui o título "## Referências"
             } else {
                 let prosePrompt = "";
                 let contextForProse = "";
                 let imageInfoForProse: string | undefined = undefined;
 
-                const formattedFichas = researchedFichas.map((f, idx) => 
+                const formattedFichas = researchedFichas.map((f, idx) =>
                     `Ficha ${idx+1}: Título: ${f.titulo}\nAutor: ${f.autor || 'N/A'}\nAno: ${f.anoPublicacao || 's.d.'}\nResumo: ${f.resumo}\nCitações: ${(f.citacoesRelevantes || [f.citacao || 'N/A']).join('; ')}\nURL: ${f.url}`
                 ).join("\n\n---\n\n");
 
@@ -422,15 +419,15 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
                         .map(s => `Seção: ${s.title}\n${(s.content || "").substring(0, 500)}...`) // Add guard for s.content
                         .join("\n\n---\n\n");
                     prosePrompt = `Você é um assistente acadêmico. Escreva a CONCLUSÃO para um trabalho com o tema principal "${finalThemeForWriting}". A introdução (se disponível) foi: "${introContent || 'Não fornecida'}". As seções desenvolvidas (resumidas) foram: "${coreSectionsContent || 'Não fornecidas'}". Retome brevemente o tema principal, sumarize as principais descobertas ou argumentos, apresente reflexões finais e, opcionalmente, sugira limitações ou caminhos para pesquisas futuras. Use um tom formal e acadêmico. O idioma é ${targetLanguage}.`;
-                } else { 
+                } else {
                     prosePrompt = `Você é um assistente acadêmico. Desenvolva o conteúdo para a seção intitulada "${sectionTitle}" de um trabalho sobre "${finalThemeForWriting}". O idioma é ${targetLanguage} e o estilo de citação é ${citationStyle}.`;
                     if (formattedFichas) {
                          prosePrompt += ` Baseie-se PRINCIPALMENTE nas seguintes fichas de leitura, integrando as informações de forma coesa e citando as fontes quando utilizá-las:\n${formattedFichas}`;
-                         
+
                          const imagesFromFichas: string[] = [];
                          researchedFichas.forEach(ficha => {
                             if (ficha.imagens && ficha.imagens.length > 0) {
-                                ficha.imagens.forEach((img: ImagemConteudo) => { 
+                                ficha.imagens.forEach((img: ImagemConteudo) => {
                                     imagesFromFichas.push(`${img.legenda || ficha.titulo} (${img.src})`);
                                 });
                             }
@@ -447,7 +444,7 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
                         prosePrompt += `\n\nConsidere também o conteúdo das seções já escritas para manter a coerência e evitar repetições desnecessárias:\n${previousSectionsSummary}`;
                     }
                 }
-                
+
                 const proseInput = {
                     prompt: prosePrompt,
                     contextContent: contextForProse || ( (sectionTitleLower.includes("desenvolvimento") || (!sectionTitleLower.includes("introdução") && !sectionTitleLower.includes("conclusão"))) && formattedFichas ? formattedFichas : undefined),
@@ -460,30 +457,37 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(proseInput)
                 });
-                if (!apiResponse.ok) { 
+                if (!apiResponse.ok) {
                     const errText = await apiResponse.text();
                     console.error("Erro API /generate-academic-prose:", errText);
-                    const err = JSON.parse(errText); 
-                    throw new Error(err.details || err.error || `Erro desconhecido ao gerar conteúdo para "${sectionTitle}"`); 
+                    let err;
+                    try {
+                        err = JSON.parse(errText);
+                    } catch (parseError) {
+                        err = { error: "Erro desconhecido ao gerar conteúdo", details: errText.substring(0, 200) };
+                    }
+                    throw new Error(err.details || err.error || `Erro desconhecido ao gerar conteúdo para "${sectionTitle}"`);
                 }
                 const result: GenerateAcademicResponseOutput = await apiResponse.json();
-                sectionContent = result.response;
+                sectionContent = result.response; // IA já inclui o título "## Nome da Seção"
             }
         } catch (error: any) {
             tempAddWritingLog(`❌ Erro ao gerar conteúdo para "${sectionTitle}": ${error.message || String(error)}. Usando placeholder.`);
-            sectionContent = `## ${sectionTitle}\n\nConteúdo para "${sectionTitle}" não pôde ser gerado devido a um erro. Por favor, tente novamente ou edite manualmente.`;
+            // A IA deve retornar o título, então o placeholder aqui não precisa do título.
+            sectionContent = `Conteúdo para "${sectionTitle}" não pôde ser gerado devido a um erro. Por favor, tente novamente ou edite manualmente.`;
         }
-        
+
         const currentSection: AcademicWorkSection = { title: sectionTitle, content: sectionContent };
         tempDevelopedSections.push(currentSection);
-        setDevelopedSections([...tempDevelopedSections]); 
+        setDevelopedSections([...tempDevelopedSections]);
 
-        // Append content (AI is expected to include the title now)
+        // A IA já inclui o título da seção (##), exceto para bibliografia, que o frontend adicionará
         if (sectionTitle.toLowerCase().includes("referências") || sectionTitle.toLowerCase().includes("bibliografia")) {
-            tempFullText += `## ${sectionTitle}\n\n${sectionContent}\n\n`; // Frontend adds title for bibliography
+            tempFullText += `## ${sectionTitle}\n\n${sectionContent}\n\n`;
         } else {
-            tempFullText += `${sectionContent}\n\n`; // AI adds title for other sections
+            tempFullText += `${sectionContent}\n\n`;
         }
+
         setGeneratedFullText(tempFullText);
         tempAddWritingLog(`✅ Seção "${sectionTitle}" escrita.`);
 
@@ -496,52 +500,52 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
     setWritingProgress(100);
     setIsWriting(false);
     if (activeWork) {
-      onUpdateWork({ 
-        ...activeWork, 
-        sections: tempDevelopedSections, 
-        fullGeneratedText: tempFullText, 
-        title: activeWork.title || finalThemeForWriting, 
-        theme: finalThemeForWriting, 
+      onUpdateWork({
+        ...activeWork,
+        sections: tempDevelopedSections,
+        fullGeneratedText: tempFullText,
+        title: activeWork.title || finalThemeForWriting,
+        theme: finalThemeForWriting,
         writingLog: currentWritingLogs,
-        lastUpdatedAt: Date.now() 
+        lastUpdatedAt: Date.now()
       });
     }
-  }, [activeWork, onUpdateWork, currentDetectedTopic, researchedFichas, targetLanguage, citationStyle, toast, generatedIndex, developedSections, generatedFullText]);
+  }, [activeWork, onUpdateWork, currentDetectedTopic, researchedFichas, targetLanguage, citationStyle, toast, generatedIndex, developedSections]);
 
 
   useEffect(() => {
     if (startFichamentoChain && activeWork && activeWork.theme && !isLoading && !isResearching) {
-        const themeToUse = activeWork.theme; 
+        const themeToUse = activeWork.theme;
         if(themeToUse) {
             handleStartResearch(themeToUse);
         } else {
             addResearchLog("⚠️ Tema do trabalho não definido. Não é possível iniciar a pesquisa.");
             toast({ title: "Tema Ausente", description: "O tema do trabalho precisa ser definido para iniciar a pesquisa.", variant: "destructive"});
         }
-        setStartFichamentoChain(false); 
+        setStartFichamentoChain(false);
     }
   }, [startFichamentoChain, activeWork, isLoading, isResearching, handleStartResearch, addResearchLog, toast]);
 
   useEffect(() => {
     if (fichamentoCompleted && !isResearching && !isWriting) {
       if (researchedFichas.length > 0) {
-        setStartWritingChain(true); 
+        setStartWritingChain(true);
       } else {
         addWritingLog("⚠️ Pesquisa concluída, mas nenhuma ficha foi gerada. Desenvolvimento automático não iniciado.");
         toast({
             title: "Pesquisa Incompleta",
             description: "Nenhuma ficha de leitura foi gerada. Não é possível iniciar o desenvolvimento do texto automaticamente.",
-            variant: "default", 
+            variant: "default",
         });
       }
-      setFichamentoCompleted(false); 
+      setFichamentoCompleted(false);
     }
   }, [fichamentoCompleted, isResearching, isWriting, researchedFichas, addWritingLog, toast]);
 
   useEffect(() => {
     if (startWritingChain && !isLoading && !isWriting) {
       handleStartWriting();
-      setStartWritingChain(false); 
+      setStartWritingChain(false);
     }
   }, [startWritingChain, isLoading, isWriting, handleStartWriting]);
 
@@ -556,38 +560,38 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
       toast({ title: "Nenhum Trabalho Ativo", description: "Crie ou selecione um trabalho acadêmico primeiro.", variant: "destructive"});
       return;
     }
-    
+
     setResearchedFichas([]);
     setGeneratedIndex([]);
     setDevelopedSections([]);
     setGeneratedFullText(null);
     setResearchLog([`${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit'})}: Iniciando processo completo para: "${themeToUse}"`]);
     setWritingLog([]);
-    setCurrentDetectedTopic(null); 
+    setCurrentDetectedTopic(null);
     setResearchProgress(0);
     setWritingProgress(0);
-    setIsResearching(false); 
+    setIsResearching(false);
     setIsWriting(false);
-    
-    const updatedWorkData: AcademicWork = { 
-      ...activeWork, 
-      theme: themeToUse, 
+
+    const updatedWorkData: AcademicWork = {
+      ...activeWork,
+      theme: themeToUse,
       title: (activeWork.title && !activeWork.title.startsWith("Novo Trabalho")) || themeOverride ? (themeOverride || activeWork.title) : themeToUse,
-      fichas: [], 
-      sections: [], 
-      fullGeneratedText: "", 
-      generatedIndex: [], 
-      researchLog: [`${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit'})}: Iniciando processo completo para: "${themeToUse}"`], 
+      fichas: [],
+      sections: [],
+      fullGeneratedText: "",
+      generatedIndex: [],
+      researchLog: [`${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit'})}: Iniciando processo completo para: "${themeToUse}"`],
       writingLog: [],
-      detectedTopic: null, 
-      lastUpdatedAt: Date.now() 
+      detectedTopic: null,
+      lastUpdatedAt: Date.now()
     };
-    onUpdateWork(updatedWorkData); 
-    
+    onUpdateWork(updatedWorkData);
+
     setStartFichamentoChain(true);
-    
-    if (!themeOverride && workThemeInput.trim() === themeToUse) { 
-        setWorkThemeInput(""); 
+
+    if (!themeOverride && workThemeInput.trim() === themeToUse) {
+        setWorkThemeInput("");
     }
   };
 
@@ -674,7 +678,7 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
               ))}
             </div>
           )}
-          
+
           {writingLog.length > 0 && (
              <div className="text-xs space-y-1 p-2 border rounded-md bg-card shadow-sm max-h-60 overflow-y-auto">
               <h3 className="font-semibold text-sm mb-1 text-primary sticky top-0 bg-card/80 backdrop-blur-sm py-1">Log do Desenvolvimento:</h3>
@@ -688,13 +692,16 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
             </div>
           )}
 
-          {generatedFullText && (
+          {generatedFullText && activeWork && (
             <div className="p-2 border rounded-md bg-card shadow-sm">
+                 <h1 className="text-xl font-bold text-center text-primary mb-4 mt-2 markdown-container prose-headings:my-1 prose-headings:text-lg">
+                    {activeWork.title || workThemeInput || "Trabalho Acadêmico"}
+                 </h1>
                  <div className="flex justify-between items-center mb-2 sticky top-0 bg-card/80 backdrop-blur-sm py-1 z-10">
                     <h3 className="font-semibold text-sm text-primary">Conteúdo Gerado:</h3>
-                    <MarkdownToDocx 
-                        markdownContent={generatedFullText} 
-                        fileName={`Cognick_Trabalho_${(activeWork?.title || workThemeInput || 'Academico').replace(/\s+/g, '_').substring(0,30)}`} 
+                    <MarkdownToDocx
+                        markdownContent={`# ${activeWork.title || workThemeInput || "Trabalho Acadêmico"}\n\n${generatedFullText}`}
+                        fileName={`Cognick_Trabalho_${(activeWork?.title || workThemeInput || 'Academico').replace(/\s+/g, '_').substring(0,30)}`}
                         disabled={!generatedFullText || isLoading}
                     />
                  </div>
@@ -717,12 +724,12 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
                 className="flex-1 rounded-lg px-4 py-2 focus-visible:ring-primary text-sm"
                 aria-label="Input do tema do trabalho"
             />
-            <Button 
-                type="button" 
+            <Button
+                type="button"
                 onClick={() => handleInitiateFullProcess()}
-                disabled={isLoading || !workThemeInput.trim()} 
-                size="icon" 
-                className="rounded-full bg-primary hover:bg-primary/90 disabled:bg-muted flex-shrink-0 mt-1" 
+                disabled={isLoading || !workThemeInput.trim()}
+                size="icon"
+                className="rounded-full bg-primary hover:bg-primary/90 disabled:bg-muted flex-shrink-0 mt-1"
                 aria-label="Iniciar processo de criação do trabalho"
             >
                 {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <SendHorizontal className="h-5 w-5" />}
@@ -732,3 +739,4 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
     </div>
   );
 }
+
