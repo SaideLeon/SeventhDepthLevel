@@ -1,20 +1,23 @@
 
 import axios from 'axios';
 import { load } from 'cheerio';
+import type { ImagemConteudo } from '@/types'; // Import ImagemConteudo
 
 export interface SearchResult {
   titulo: string;
   url: string;
 }
 
+// Updated to align with ConteudoRaspado from src/types.ts
 export interface PageContent {
   url: string;
   titulo: string;
   conteudo: string;
-  imagens: Array<{ src: string; legenda: string }>;
-  autor: string;
-  dataPublicacao?: string; // Optional: Add publication date if available
+  imagens?: ImagemConteudo[];
+  autor?: string;
+  dataPublicacao?: string;
   erro?: boolean;
+  citacao?: string; // Added to match ConteudoRaspado
 }
 
 async function rasparTodasPaginasBusca(query: string, todasPaginas: boolean = false, maxPaginasOption?: number): Promise<SearchResult[]> {
@@ -23,7 +26,6 @@ async function rasparTodasPaginasBusca(query: string, todasPaginas: boolean = fa
   const urlsSet = new Set<string>();
   const encodedQuery = encodeURIComponent(query);
   
-  // If todasPaginas is true, search up to maxPaginasOption (default 3 if not provided). Otherwise, search 1 page.
   const maxPaginas = todasPaginas ? (maxPaginasOption || 3) : 1;
   console.log(`Raspagem: Buscando até ${maxPaginas} páginas de resultados para "${query}"`);
 
@@ -36,7 +38,7 @@ async function rasparTodasPaginasBusca(query: string, todasPaginas: boolean = fa
     try {
       const { data: html } = await axios.get(url, { 
         timeout: 15000,
-        headers: { // Add headers to mimic a browser
+        headers: { 
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
           'Accept-Language': 'en-US,en;q=0.9,pt;q=0.8',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
@@ -55,7 +57,7 @@ async function rasparTodasPaginasBusca(query: string, todasPaginas: boolean = fa
           href &&
           titulo.length > 0 &&
           !urlsSet.has(href) &&
-          href.includes("todamateria.com.br/") // Basic filter for relevance
+          href.includes("todamateria.com.br/")
         ) {
           resultados.push({ titulo, url: href });
           urlsSet.add(href);
@@ -68,12 +70,12 @@ async function rasparTodasPaginasBusca(query: string, todasPaginas: boolean = fa
          console.log(`Raspagem: "Nenhum resultado encontrado" na primeira página. Parando.`);
          break;
       }
-      if (pagina >= maxPaginas || encontrouNestaPagina === 0 ) { // Stop if max pages reached or no new results
+      if (pagina >= maxPaginas || encontrouNestaPagina === 0 ) {
          console.log(`Raspagem: Condição de parada atingida na página ${pagina}.`);
          break;
       }
       pagina++;
-      await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 200)); // Small delay between page fetches
+      await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 200));
 
     } catch (error: any) {
       console.error(`Erro ao raspar página de busca ${url}:`, error.message);
@@ -94,15 +96,14 @@ async function rasparConteudoPagina(url: string): Promise<PageContent> {
         timeout: 15000,
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Referer': 'https://www.todamateria.com.br/', // Good practice to include referer
+            'Referer': 'https://www.todamateria.com.br/',
         }
     });
     const $ = load(html);
     const titulo = $('h1.titulo-materia, h1.article-title, h1').first().text().trim();
     const paragrafos: string[] = [];
-    const imagens: { src: string; legenda: string }[] = [];
+    const imagensRaspadas: ImagemConteudo[] = []; // Use ImagemConteudo type
     
-    // Prioritize figures for images as they often have captions
     $('figure.image-container, figure.wp-caption, figure').each((_, fig) => {
       const img = $(fig).find('img').first();
       let src = img.attr('src') || img.data('src') || '';
@@ -110,27 +111,25 @@ async function rasparConteudoPagina(url: string): Promise<PageContent> {
       else if (src && src.startsWith('/')) src = new URL(src, 'https://www.todamateria.com.br').toString();
       
       const legenda = $(fig).find('figcaption, .wp-caption-text').text().trim();
-      if (src && !imagens.some(im => im.src === src)) { // Avoid duplicates
-          imagens.push({ src, legenda: legenda || img.attr('alt') || titulo || 'Imagem relacionada' });
+      if (src && !imagensRaspadas.some(im => im.src === src)) {
+          imagensRaspadas.push({ src, legenda: legenda || img.attr('alt') || titulo || 'Imagem relacionada' });
       }
     });
 
-    // General image scraping as fallback or supplement
     $('.main-content article img, .entry-content img, article .content img, article img').each((_, imgEl) => {
       const img = $(imgEl);
       let src = img.attr('src') || img.data('src') || '';
       if (src && src.startsWith('//')) src = 'https:' + src;
       else if (src && src.startsWith('/')) src = new URL(src, 'https://www.todamateria.com.br').toString();
       
-      if (src && !imagens.some(im => im.src === src)) { // Avoid duplicates
+      if (src && !imagensRaspadas.some(im => im.src === src)) {
         const altText = img.attr('alt') || '';
         const figureParent = img.closest('figure');
         const caption = figureParent.length ? figureParent.find('figcaption, .wp-caption-text').text().trim() : '';
-        imagens.push({ src, legenda: caption || altText || titulo || 'Imagem ilustrativa' });
+        imagensRaspadas.push({ src, legenda: caption || altText || titulo || 'Imagem ilustrativa' });
       }
     });
 
-    // Content extraction from main article body
     const articleSelectors = [
         'article .entry-content p', 
         'article .materia-conteudo p',
@@ -138,26 +137,23 @@ async function rasparConteudoPagina(url: string): Promise<PageContent> {
         '.main-content article p', 
         '.main-content .content p', 
         'article .content p', 
-        'article p' // More generic as fallback
+        'article p'
     ];
     let foundParagraphs = false;
     for (const selector of articleSelectors) {
         $(selector).each((_, el) => {
             const txt = $(el).text().trim();
-            if (txt.length > 20) { // Basic filter for meaningful paragraphs
+            if (txt.length > 20) {
                  paragrafos.push(txt);
                  foundParagraphs = true;
             }
         });
-        if(foundParagraphs) break; // If a specific selector yielded results, assume it's the main content
+        if(foundParagraphs) break;
     }
     
-
-    // Fallback if no specific article paragraphs found
     if (paragrafos.length === 0) {
       $('p').each((_, el) => {
         const pElement = $(el);
-        // Exclude paragraphs from common non-content areas
         if (pElement.parents('.sidebar, .footer, .ad-unit, header, nav, script, style, .comments-area, .related-posts, .breadcrumbs').length === 0) {
           const txt = pElement.text().trim();
           if (txt.length > 20) {
@@ -179,7 +175,6 @@ async function rasparConteudoPagina(url: string): Promise<PageContent> {
         $('.entry-date.published, .meta-date, .post-date, .date.published').first().text().trim() ||
         '';
 
-    // Extract from JSON-LD if not found
     if (!autor || !dataPublicacao) {
       $('script[type="application/ld+json"]').each((_, el) => {
         try {
@@ -198,13 +193,12 @@ async function rasparConteudoPagina(url: string): Promise<PageContent> {
                     if (!dataPublicacao && item.datePublished && typeof item.datePublished === 'string') {
                     dataPublicacao = item.datePublished;
                     }
-                     if (!dataPublicacao && item.dateModified && typeof item.dateModified === 'string') { // Fallback to modified date
+                     if (!dataPublicacao && item.dateModified && typeof item.dateModified === 'string') {
                       if (!dataPublicacao) dataPublicacao = item.dateModified;
                     }
                 }
                  if(autor && dataPublicacao) break;
             }
-
           }
         } catch (e) {
           // console.warn('Raspagem Conteúdo: Erro ao analisar JSON-LD:', e);
@@ -212,14 +206,26 @@ async function rasparConteudoPagina(url: string): Promise<PageContent> {
       });
     }
     
+    // Attempt to extract a significant quote for 'citacao' - very basic example
+    let citacaoPrincipal: string | undefined = undefined;
+    $('blockquote p, q').first().each((_, el) => {
+        const quoteText = $(el).text().trim();
+        if (quoteText.length > 50 && quoteText.length < 300) { // Arbitrary length for a "good" quote
+            citacaoPrincipal = quoteText;
+            return false; // Break loop
+        }
+    });
+
+
     console.log(`Raspagem Conteúdo: Sucesso para ${url}. Título: ${titulo}, Autor: ${autor || 'N/A'}, Data: ${dataPublicacao || 'N/A'}`);
     return {
       url,
       titulo,
       conteudo: paragrafos.join('\n\n'),
-      imagens,
-      autor: autor || "Não especificado",
-      dataPublicacao: dataPublicacao || undefined,
+      imagens: imagensRaspadas.length > 0 ? imagensRaspadas : undefined,
+      autor: autor || undefined, // Return undefined if empty
+      dataPublicacao: dataPublicacao || undefined, // Return undefined if empty
+      citacao: citacaoPrincipal, // Add extracted citation
     };
 
   } catch(e: any) {
@@ -229,5 +235,3 @@ async function rasparConteudoPagina(url: string): Promise<PageContent> {
 }
 
 export { rasparTodasPaginasBusca, rasparConteudoPagina };
-
-    

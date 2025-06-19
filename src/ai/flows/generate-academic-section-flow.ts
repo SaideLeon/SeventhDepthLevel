@@ -10,12 +10,26 @@
 
 import {ai} from '@/ai/genkit';
 import {z}from 'genkit';
-import {FichaLeituraSchema} from './generate-fichamento-flow'; // Assuming FichaLeitura schema is exported
+// Assuming FichaLeitura type for input will be adapted from the Groq FichaLeitura (src/types.ts)
+// For Zod validation, we define what this flow *expects*.
+
+const FichaLeituraInputSchemaForGenkit = z.object({
+  url: z.string().describe("URL of the source material."),
+  titulo: z.string().describe("Title of the source material."),
+  autor: z.string().optional().describe("Author(s) of the source material."),
+  anoPublicacao: z.string().optional().describe("Year of publication. Use 's.d.' if not found."),
+  palavrasChave: z.array(z.string()).optional().describe("A list of main keywords summarizing the content."),
+  resumo: z.string().describe("A concise summary of the content."),
+  citacoesRelevantes: z.array(z.string()).optional().describe("Direct short quotes from the text."),
+  // comentariosAdicionais: z.string().optional(), // Not present in Groq FichaLeitura
+});
+export type FichaLeituraForGenkit = z.infer<typeof FichaLeituraInputSchemaForGenkit>;
+
 
 export const GenerateAcademicSectionInputSchema = z.object({
   sectionTitle: z.string().describe('The title of the current section to be developed.'),
   mainTopic: z.string().describe('The overall main topic/theme of the academic paper.'),
-  fichasDeLeitura: z.array(FichaLeituraSchema).optional().describe('An array of reading summaries (fichas de leitura) relevant to this section or the overall topic. These are the primary sources of information.'),
+  fichasDeLeitura: z.array(FichaLeituraInputSchemaForGenkit).optional().describe('An array of reading summaries (fichas de leitura) relevant to this section or the overall topic. These are the primary sources of information.'),
   completedSections: z.array(z.object({title: z.string(), content: z.string()})).optional().describe('Content of previously written sections, to maintain coherence and avoid repetition. Provided as {title: string, content: string}[].'),
   targetLanguage: z.string().optional().default('pt-BR').describe('The language for the section content.'),
   citationStyle: z.string().optional().default('APA').describe('The citation style to follow (e.g., APA, ABNT, MLA). Provide general guidance if specific style is complex.'),
@@ -51,7 +65,9 @@ Fichas de Leitura Fornecidas:
 Ficha Título: {{titulo}}
 Autor: {{#if autor}}{{autor}}{{else}}N/A{{/if}} ({{#if anoPublicacao}}{{anoPublicacao}}{{else}}s.d.{{/if}})
 URL: {{url}}
+{{#if palavrasChave}}
 Palavras-chave: {{#each palavrasChave}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}
+{{/if}}
 Resumo: {{resumo}}
 {{#if citacoesRelevantes}}
 Citações Relevantes da Ficha:

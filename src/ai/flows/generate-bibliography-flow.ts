@@ -10,10 +10,21 @@
 
 import {ai} from '@/ai/genkit';
 import {z}from 'genkit';
-import {FichaLeituraSchema} from './generate-fichamento-flow';
+
+// Input schema for bibliography generation, expecting fields that FichaLeitura (Groq or adapted) provides.
+const FichaLeituraInputSchemaForBiblio = z.object({
+  url: z.string().describe("URL of the source material."),
+  titulo: z.string().describe("Title of the source material."),
+  autor: z.string().optional().describe("Author(s) of the source material."),
+  anoPublicacao: z.string().optional().describe("Year of publication. Use 's.d.' if not found."),
+  // palavrasChave are not strictly needed for bibliography but kept if schema is reused
+  palavrasChave: z.array(z.string()).optional().describe("A list of main keywords summarizing the content."), 
+});
+export type FichaLeituraForBiblio = z.infer<typeof FichaLeituraInputSchemaForBiblio>;
+
 
 export const GenerateBibliographyInputSchema = z.object({
-  fichasDeLeitura: z.array(FichaLeituraSchema).describe('An array of reading summaries (fichas de leitura) from which to generate the bibliography.'),
+  fichasDeLeitura: z.array(FichaLeituraInputSchemaForBiblio).describe('An array of reading summaries (fichas de leitura) from which to generate the bibliography.'),
   citationStyle: z.string().optional().default('APA').describe('The citation style to follow (e.g., APA, ABNT, MLA). Provide general guidance if specific style is complex.'),
   targetLanguage: z.string().optional().default('pt-BR').describe('The language for any introductory text if needed (bibliography itself is usually style-dependent).'),
 });
