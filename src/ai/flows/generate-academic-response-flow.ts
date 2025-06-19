@@ -89,8 +89,9 @@ Mensagens anteriores (da mais antiga relevante para a mais recente antes da perg
 
 A saída deve ser formatada em Markdown.
 Ao gerar o texto, por favor, siga estas etapas meticulosamente:
-1.  **Estrutura e Cabeçalhos**: Você pode usar sub-cabeçalhos (ex: ### Subtítulo, #### Outro Subtítulo) dentro do conteúdo da seção que está gerando, se for apropriado para organizar o texto.
-    **Importante**: Se o prompt atual pedir para você gerar o conteúdo para UMA seção específica (ex: "Desenvolva a seção 'Título Principal da Seção'...", "Escreva a introdução...", "Escreva a conclusão..."), **NÃO** inclua o título principal dessa seção (ou "Introdução", "Conclusão") como um cabeçalho no início da sua resposta. O título principal já será adicionado externamente. Gere apenas o texto que deve vir *abaixo* desse título principal.
+1.  **Estrutura e Cabeçalhos**:
+    a.  **Título Principal da Seção**: Se o prompt atual pedir para você gerar o conteúdo para UMA seção específica (ex: "Desenvolva a seção 'Título da Seção X'...", "Escreva a introdução para...", "Escreva a conclusão para..."), você **DEVE** iniciar sua resposta com o título principal dessa seção formatado como um cabeçalho Markdown de nível 2 (por exemplo, \`## Introdução\`, \`## Título da Seção X\`, \`## Conclusão\`).
+    b.  **Sub-cabeçalhos**: Você pode usar sub-cabeçalhos (ex: ### Subtítulo, #### Outro Subtítulo) dentro do conteúdo da seção que está gerando, se for apropriado para organizar o texto abaixo do título principal.
 2.  **Desenvolvimento do Conteúdo**: Para o(s) cabeçalho(s) que você criar ou identificar, assegure que o conteúdo abaixo dele seja completamente desenvolvido e expandido. Forneça explicações detalhadas, exemplos, argumentos e detalhes de suporte conforme apropriado para um trabalho acadêmico e de acordo com o prompt atual.
 3.  **Colocação e Formatação de Imagens - INSTRUÇÕES CRÍTICAS (APENAS PARA SEÇÕES DE DESENVOLVIMENTO, NÃO PARA INTRODUÇÃO/CONCLUSÃO)**:
     a.  **Condição**: Se estiver desenvolvendo uma seção principal (NÃO uma introdução ou conclusão) e se imagens forem fornecidas no contexto (via \`imageInfo\` OU dentro do \`contextContent\` que representa fichas de leitura), e você determinar que uma imagem é diretamente relevante para um cabeçalho ou subcabeçalho específico que você está gerando, você **DEVE** inserir essa imagem usando o formato Markdown (\`![texto alternativo](URL)\`) imediatamente **ABAIXO** desse cabeçalho relevante.
@@ -131,15 +132,15 @@ O usuário também forneceu a seguinte imagem diretamente com sua pergunta atual
 Tarefa/prompt atual do usuário: {{{prompt}}}
 
 Responda APENAS com o texto Markdown solicitado. Não adicione comentários ou explicações sobre o que você está fazendo, a menos que o prompt peça explicitamente.
-Se o prompt for para gerar uma INTRODUÇÃO, gere APENAS o texto da introdução, sem repetir o título "Introdução".
-Se o prompt for para gerar uma SEÇÃO específica (cujo título foi fornecido no prompt), gere APENAS o conteúdo dessa seção, sem repetir o título da seção principal no início da sua resposta.
-Se o prompt for para gerar uma CONCLUSÃO, gere APENAS o texto da conclusão, sem repetir o título "Conclusão".
-Se o prompt for para gerar uma BIBLIOGRAFIA, gere APENAS a lista de referências.
+Se o prompt for para gerar uma INTRODUÇÃO, sua resposta DEVE começar com \`## Introdução\` seguido pelo conteúdo da introdução.
+Se o prompt for para gerar uma SEÇÃO específica (cujo título foi fornecido no prompt, por exemplo, 'Minha Seção'), sua resposta DEVE começar com \`## Minha Seção\` (usando o título exato fornecido) seguido pelo conteúdo da seção.
+Se o prompt for para gerar uma CONCLUSÃO, sua resposta DEVE começar com \`## Conclusão\` seguido pelo conteúdo da conclusão.
+Se o prompt for para gerar uma BIBLIOGRAFIA (o que este fluxo geralmente não faz, mas como regra geral), gere APENAS a lista de referências (o título "Referências" será adicionado externamente).
 Sua resposta deve ser EXCLUSIVAMENTE um objeto JSON válido, sem nenhum texto ou formatação Markdown antes ou depois dele.
-O objeto JSON deve ter uma única chave "response". O valor dessa chave será o conteúdo solicitado em formato Markdown.
-Exemplo de formato de saída JSON esperado:
+O objeto JSON deve ter uma única chave "response". O valor dessa chave será o conteúdo solicitado em formato Markdown, incluindo o título da seção conforme instruído acima (exceto para bibliografia).
+Exemplo de formato de saída JSON esperado para uma seção "Exemplo de Título":
 {
-  "response": "Este é o conteúdo Markdown gerado para a tarefa solicitada..."
+  "response": "## Exemplo de Título\\n\\nEste é o conteúdo Markdown gerado para a seção..."
 }
 `,
 });
