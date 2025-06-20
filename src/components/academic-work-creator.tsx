@@ -46,9 +46,9 @@ interface AcademicWorkCreatorProps {
 }
 
 const SUGGESTION_THEMES = [
-    "estudo de sistema digestivo",
-    "importancia da fotossintese na biodiversidade",
-    "História da segunda guerra mundial",
+    "Estudo do Sistema Digestivo",
+    "Importância da fotossíntese na biodiversidade",
+    "História da Segunda Guerra Mundial",
     "Efeitos dos Tipos de Clima no Meio Ambiente e na Sociedade"
 ];
 
@@ -735,5 +735,3 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
     </div>
   );
 }
-
-    
