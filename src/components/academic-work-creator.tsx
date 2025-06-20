@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input as ShadInput } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from "@/components/ui/progress";
-import { Loader2, SendHorizontal, Sparkles, BookCheck, FileText as FileTextLucideIcon, FileText } from 'lucide-react';
+import { Loader2, SendHorizontal, Sparkles, BookCheck, FileText as FileTextLucideIcon, FileText, List } from 'lucide-react';
 import MarkdownToDocx from '@/components/MarkdownToDocx';
 import { useToast } from "@/hooks/use-toast";
 import { MarkdownWithCode } from '@/components/Markdown/MarkdownWithCode';
@@ -407,8 +407,9 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
                     `Ficha ${idx+1}: Título: ${f.titulo}\nAutor: ${f.autor || 'N/A'}\nAno: ${f.anoPublicacao || 's.d.'}\nResumo: ${f.resumo}\nCitações: ${(f.citacoesRelevantes || [f.citacao || 'N/A']).join('; ')}\nURL: ${f.url}`
                 ).join("\n\n---\n\n");
 
+                prosePrompt = `Você é um assistente acadêmico. O idioma é ${targetLanguage} e o estilo de citação é ${citationStyle}. Sua resposta DEVE começar com o título da seção apropriado formatado como um cabeçalho Markdown de nível 2 (ex: "## Introdução").`;
                 if (sectionTitleLower.includes("introdução")) {
-                    prosePrompt = `Você é um assistente acadêmico. Escreva a INTRODUÇÃO para um trabalho com o tema principal "${finalThemeForWriting}". A estrutura planejada do trabalho (índice) é: ${tempGeneratedIndexTitles.join(', ')}. Contextualize o tema, apresente sua relevância, o objetivo geral do trabalho e descreva brevemente a estrutura que será seguida. Use um tom formal e acadêmico. O idioma é ${targetLanguage}.`;
+                    prosePrompt += ` Escreva a INTRODUÇÃO para um trabalho com o tema principal "${finalThemeForWriting}". A estrutura planejada do trabalho (índice) é: ${tempGeneratedIndexTitles.join(', ')}. Contextualize o tema, apresente sua relevância, o objetivo geral do trabalho e descreva brevemente a estrutura que será seguida. Use um tom formal e acadêmico.`;
                     if (formattedFichas) {
                         contextForProse = `Considere as seguintes fichas de leitura como material de base, se relevante para a introdução:\n${formattedFichas}`;
                     }
@@ -416,11 +417,11 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
                     const introContent = tempDevelopedSections.find(s => s.title.toLowerCase().includes("introdução"))?.content;
                     const coreSectionsContent = tempDevelopedSections
                         .filter(s => !s.title.toLowerCase().includes("introdução") && !s.title.toLowerCase().includes("conclusão") && !s.title.toLowerCase().includes("referências") && !s.title.toLowerCase().includes("bibliografia"))
-                        .map(s => `Seção: ${s.title}\n${(s.content || "").substring(0, 500)}...`) // Add guard for s.content
+                        .map(s => `Seção: ${s.title}\n${(s.content || "").substring(0, 500)}...`)
                         .join("\n\n---\n\n");
-                    prosePrompt = `Você é um assistente acadêmico. Escreva a CONCLUSÃO para um trabalho com o tema principal "${finalThemeForWriting}". A introdução (se disponível) foi: "${introContent || 'Não fornecida'}". As seções desenvolvidas (resumidas) foram: "${coreSectionsContent || 'Não fornecidas'}". Retome brevemente o tema principal, sumarize as principais descobertas ou argumentos, apresente reflexões finais e, opcionalmente, sugira limitações ou caminhos para pesquisas futuras. Use um tom formal e acadêmico. O idioma é ${targetLanguage}.`;
+                    prosePrompt += ` Escreva a CONCLUSÃO para um trabalho com o tema principal "${finalThemeForWriting}". A introdução (se disponível) foi: "${introContent || 'Não fornecida'}". As seções desenvolvidas (resumidas) foram: "${coreSectionsContent || 'Não fornecidas'}". Retome brevemente o tema principal, sumarize as principais descobertas ou argumentos, apresente reflexões finais e, opcionalmente, sugira limitações ou caminhos para pesquisas futuras. Use um tom formal e acadêmico.`;
                 } else {
-                    prosePrompt = `Você é um assistente acadêmico. Desenvolva o conteúdo para a seção intitulada "${sectionTitle}" de um trabalho sobre "${finalThemeForWriting}". O idioma é ${targetLanguage} e o estilo de citação é ${citationStyle}.`;
+                    prosePrompt += ` Desenvolva o conteúdo para a seção intitulada "${sectionTitle}" de um trabalho sobre "${finalThemeForWriting}".`;
                     if (formattedFichas) {
                          prosePrompt += ` Baseie-se PRINCIPALMENTE nas seguintes fichas de leitura, integrando as informações de forma coesa e citando as fontes quando utilizá-las:\n${formattedFichas}`;
 
@@ -440,7 +441,7 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
                         prosePrompt += " Baseie-se no seu conhecimento geral sobre o tema para desenvolver esta seção, pois não foram fornecidas fichas de leitura específicas.";
                     }
                     if (tempDevelopedSections.length > 0) {
-                        const previousSectionsSummary = tempDevelopedSections.map(s => `Seção Anterior: ${s.title}\n${(s.content || "").substring(0, 300)}...`).join("\n---\n"); // Add guard for s.content
+                        const previousSectionsSummary = tempDevelopedSections.map(s => `Seção Anterior: ${s.title}\n${(s.content || "").substring(0, 300)}...`).join("\n---\n");
                         prosePrompt += `\n\nConsidere também o conteúdo das seções já escritas para manter a coerência e evitar repetições desnecessárias:\n${previousSectionsSummary}`;
                     }
                 }
@@ -479,13 +480,13 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
         const currentSection: AcademicWorkSection = { title: sectionTitle, content: sectionContent };
         tempDevelopedSections.push(currentSection);
         setDevelopedSections([...tempDevelopedSections]);
-
+        
         if (sectionTitle.toLowerCase().includes("referências") || sectionTitle.toLowerCase().includes("bibliografia")) {
             tempFullText += `## ${sectionTitle}\n\n${sectionContent}\n\n`;
         } else {
             tempFullText += `${sectionContent}\n\n`;
         }
-
+        
         setGeneratedFullText(tempFullText);
         tempAddWritingLog(`✅ Seção "${sectionTitle}" escrita.`);
 
@@ -593,6 +594,32 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
     }
   };
 
+  const generateSlug = (text: string): string => {
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '') // remove special chars
+      .replace(/\s+/g, '-') // replace spaces with -
+      .replace(/-+/g, '-'); // replace multiple - with single -
+  };
+
+  const scrollToSection = (title: string) => {
+    const slug = generateSlug(title);
+    const container = workAreaRef.current;
+    if (container) {
+      // The content from the AI includes the "## Title" markdown.
+      // react-markdown will render this as an h2 element.
+      // We can look for that h2.
+      const headers = Array.from(container.querySelectorAll('h2'));
+      const element = headers.find(h => generateSlug(h.innerText) === slug);
+      
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        console.warn(`Element with matching title "${title}" (slug: #${slug}) not found for scrolling.`);
+      }
+    }
+  };
+
 
   if (!activeWork) {
     return (
@@ -606,131 +633,166 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
   }
 
   const hasAnyLog = researchLog.length > 0 || writingLog.length > 0;
-  const hasAnyContent = researchedFichas.length > 0 || generatedFullText;
+  const hasAnyContent = researchedFichas.length > 0 || developedSections.length > 0;
   const showInitialScreen = !hasAnyLog && !hasAnyContent && !isLoading;
 
 
   return (
-    <div className="flex flex-col h-full bg-background text-foreground">
-      <ScrollArea className="flex-1 p-3 md:p-4" viewportRef={workAreaRef}>
-        <div className="space-y-4">
-          {showInitialScreen && (
-            <div className="flex flex-col items-center justify-center pt-10 text-center">
-              <Sparkles className="h-10 w-10 text-primary mb-4" />
-              <h2 className="text-xl font-semibold text-foreground mb-1">Crie seu Trabalho Acadêmico</h2>
-              <p className="text-sm text-muted-foreground mb-6 max-w-md">
-                Digite o tema do seu trabalho abaixo para iniciar o processo. A IA irá pesquisar, gerar fichas de leitura, criar um índice e desenvolver o conteúdo.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl w-full">
-                {SUGGESTION_THEMES.map((suggestion, index) => (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    className="p-3 h-auto text-sm text-left justify-start leading-snug whitespace-normal hover:bg-accent hover:text-accent-foreground"
-                    onClick={() => handleInitiateFullProcess(suggestion)}
-                    disabled={isLoading}
-                  >
-                    {suggestion}
-                  </Button>
+    <div className="flex flex-row h-full bg-background text-foreground">
+      <div className="flex flex-col flex-1 min-w-0">
+        <ScrollArea className="flex-1" viewportRef={workAreaRef}>
+         <div className="p-3 md:p-4 space-y-4">
+            {showInitialScreen && (
+              <div className="flex flex-col items-center justify-center pt-10 text-center">
+                <Sparkles className="h-10 w-10 text-primary mb-4" />
+                <h2 className="text-xl font-semibold text-foreground mb-1">Crie seu Trabalho Acadêmico</h2>
+                <p className="text-sm text-muted-foreground mb-6 max-w-md">
+                  Digite o tema do seu trabalho abaixo para iniciar o processo. A IA irá pesquisar, gerar fichas de leitura, criar um índice e desenvolver o conteúdo.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl w-full">
+                  {SUGGESTION_THEMES.map((suggestion, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      className="p-3 h-auto text-sm text-left justify-start leading-snug whitespace-normal hover:bg-accent hover:text-accent-foreground"
+                      onClick={() => handleInitiateFullProcess(suggestion)}
+                      disabled={isLoading}
+                    >
+                      {suggestion}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {researchLog.length > 0 && (
+              <div className="text-xs space-y-1 p-2 border rounded-md bg-card shadow-sm max-h-60 overflow-y-auto">
+                <h3 className="font-semibold text-sm mb-1 text-primary sticky top-0 bg-card/80 backdrop-blur-sm py-1">Log da Pesquisa:</h3>
+                {researchLog.map((log, i) => <div key={`rl-${activeWork.id}-${i}`}>{log}</div>)}
+                 {isResearching && (
+                  <div className="sticky bottom-0 bg-card/80 backdrop-blur-sm p-1 rounded">
+                      <Progress value={researchProgress} className="w-full h-1.5" />
+                      <p className="text-xs text-muted-foreground text-center mt-0.5">Etapa {researchCurrentStep} de {researchTotalSteps}</p>
+                  </div>
+                  )}
+              </div>
+            )}
+
+            {researchedFichas.length > 0 && (
+              <div className="text-xs space-y-1 p-2 border rounded-md bg-card shadow-sm max-h-72 overflow-y-auto">
+                <h3 className="font-semibold text-sm mb-1 text-primary sticky top-0 bg-card/80 backdrop-blur-sm py-1">Fichas de Leitura Geradas ({researchedFichas.length}):</h3>
+                {researchedFichas.map((ficha, i) => (
+                  <details key={`ficha-${activeWork.id}-${i}`} className="mb-1 p-1.5 border-b border-border last:border-b-0">
+                      <summary className="font-medium cursor-pointer text-primary/90 hover:underline text-xs">{ficha.titulo.substring(0,70)}...</summary>
+                      <p className="mt-0.5 text-muted-foreground text-[11px]"><strong>Autor:</strong> {ficha.autor || "N/A"}</p>
+                      <p className="text-muted-foreground text-[11px]"><strong>Resumo:</strong> {(ficha.resumo || "").substring(0,120)}...</p>
+                      {ficha.citacao && <p className="text-muted-foreground text-[11px]"><strong>Citação Principal:</strong> {ficha.citacao.substring(0,100)}...</p>}
+                       {ficha.imagens && ficha.imagens.length > 0 && (
+                          <div className="mt-1">
+                              <p className="text-muted-foreground text-[11px] font-semibold">Imagens:</p>
+                              {ficha.imagens.map((img, imgIdx) => (
+                                  <div key={imgIdx} className="ml-2 my-0.5">
+                                      <a href={img.src} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-[10px] truncate block max-w-full">
+                                          - {img.legenda || `Imagem ${imgIdx + 1}`} ({img.src.substring(0,40)}...)
+                                      </a>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+                      <a href={ficha.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-[11px]">Ver fonte</a>
+                  </details>
                 ))}
               </div>
-            </div>
-          )}
+            )}
 
-          {researchLog.length > 0 && (
-            <div className="text-xs space-y-1 p-2 border rounded-md bg-card shadow-sm max-h-60 overflow-y-auto">
-              <h3 className="font-semibold text-sm mb-1 text-primary sticky top-0 bg-card/80 backdrop-blur-sm py-1">Log da Pesquisa:</h3>
-              {researchLog.map((log, i) => <div key={`rl-${activeWork.id}-${i}`}>{log}</div>)}
-               {isResearching && (
-                <div className="sticky bottom-0 bg-card/80 backdrop-blur-sm p-1 rounded">
-                    <Progress value={researchProgress} className="w-full h-1.5" />
-                    <p className="text-xs text-muted-foreground text-center mt-0.5">Etapa {researchCurrentStep} de {researchTotalSteps}</p>
-                </div>
-                )}
-            </div>
-          )}
+            {writingLog.length > 0 && (
+               <div className="text-xs space-y-1 p-2 border rounded-md bg-card shadow-sm max-h-60 overflow-y-auto">
+                <h3 className="font-semibold text-sm mb-1 text-primary sticky top-0 bg-card/80 backdrop-blur-sm py-1">Log do Desenvolvimento:</h3>
+                {writingLog.map((log, i) => <div key={`wl-${activeWork.id}-${i}`}>{log}</div>)}
+                {isWriting && (
+                  <div className="sticky bottom-0 bg-card/80 backdrop-blur-sm p-1 rounded">
+                      <Progress value={writingProgress} className="w-full h-1.5" />
+                      {writingCurrentLogItem && <p className="text-xs text-muted-foreground text-center mt-0.5 truncate">{writingCurrentLogItem.split(': ').slice(-1)[0]}</p>}
+                  </div>
+                  )}
+              </div>
+            )}
+            
+            {developedSections.length > 0 && activeWork && (
+              <div className="p-2 border rounded-md bg-card shadow-sm">
+                   <div className="flex justify-between items-center mb-2 sticky top-0 bg-card/80 backdrop-blur-sm py-1 z-10">
+                      <h2 className="font-bold text-lg text-primary">{activeWork.title || "Trabalho Acadêmico"}</h2>
+                      <MarkdownToDocx
+                          markdownContent={generatedFullText}
+                          fileName={`Cognick_Trabalho_${(activeWork?.title || 'Academico').replace(/\s+/g, '_').substring(0,30)}`}
+                          disabled={!generatedFullText || isLoading}
+                      />
+                   </div>
+                  <div className="markdown-container prose-sm max-w-none mt-1">
+                    {developedSections.map((section) => (
+                      <div key={section.title} >
+                        <MarkdownWithCode content={section.content} />
+                      </div>
+                    ))}
+                  </div>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
 
-          {researchedFichas.length > 0 && (
-            <div className="text-xs space-y-1 p-2 border rounded-md bg-card shadow-sm max-h-72 overflow-y-auto">
-              <h3 className="font-semibold text-sm mb-1 text-primary sticky top-0 bg-card/80 backdrop-blur-sm py-1">Fichas de Leitura Geradas ({researchedFichas.length}):</h3>
-              {researchedFichas.map((ficha, i) => (
-                <details key={`ficha-${activeWork.id}-${i}`} className="mb-1 p-1.5 border-b border-border last:border-b-0">
-                    <summary className="font-medium cursor-pointer text-primary/90 hover:underline text-xs">{ficha.titulo.substring(0,70)}...</summary>
-                    <p className="mt-0.5 text-muted-foreground text-[11px]"><strong>Autor:</strong> {ficha.autor || "N/A"}</p>
-                    <p className="text-muted-foreground text-[11px]"><strong>Resumo:</strong> {(ficha.resumo || "").substring(0,120)}...</p> {/* Guard against undefined */}
-                    {ficha.citacao && <p className="text-muted-foreground text-[11px]"><strong>Citação Principal:</strong> {ficha.citacao.substring(0,100)}...</p>}
-                     {ficha.imagens && ficha.imagens.length > 0 && (
-                        <div className="mt-1">
-                            <p className="text-muted-foreground text-[11px] font-semibold">Imagens:</p>
-                            {ficha.imagens.map((img, imgIdx) => (
-                                <div key={imgIdx} className="ml-2 my-0.5">
-                                    <a href={img.src} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-[10px] truncate block max-w-full">
-                                        - {img.legenda || `Imagem ${imgIdx + 1}`} ({img.src.substring(0,40)}...)
-                                    </a>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                    <a href={ficha.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-[11px]">Ver fonte</a>
-                </details>
-              ))}
-            </div>
-          )}
-
-          {writingLog.length > 0 && (
-             <div className="text-xs space-y-1 p-2 border rounded-md bg-card shadow-sm max-h-60 overflow-y-auto">
-              <h3 className="font-semibold text-sm mb-1 text-primary sticky top-0 bg-card/80 backdrop-blur-sm py-1">Log do Desenvolvimento:</h3>
-              {writingLog.map((log, i) => <div key={`wl-${activeWork.id}-${i}`}>{log}</div>)}
-              {isWriting && (
-                <div className="sticky bottom-0 bg-card/80 backdrop-blur-sm p-1 rounded">
-                    <Progress value={writingProgress} className="w-full h-1.5" />
-                    {writingCurrentLogItem && <p className="text-xs text-muted-foreground text-center mt-0.5 truncate">{writingCurrentLogItem.split(': ').slice(-1)[0]}</p>}
-                </div>
-                )}
-            </div>
-          )}
-
-          {generatedFullText && activeWork && (
-            <div className="p-2 border rounded-md bg-card shadow-sm">
-                 <div className="flex justify-between items-center mb-2 sticky top-0 bg-card/80 backdrop-blur-sm py-1 z-10">
-                    <h2 className="font-bold text-lg text-primary">{activeWork.title || workThemeInput || "Trabalho Acadêmico"}</h2>
-                    <MarkdownToDocx
-                        markdownContent={generatedFullText}
-                        fileName={`Cognick_Trabalho_${(activeWork?.title || workThemeInput || 'Academico').replace(/\s+/g, '_').substring(0,30)}`}
-                        disabled={!generatedFullText || isLoading}
-                    />
-                 </div>
-                <div className="markdown-container prose-sm max-w-none mt-1">
-                    <MarkdownWithCode content={generatedFullText} />
-                </div>
-            </div>
-          )}
-        </div>
-      </ScrollArea>
-
-      <div className="p-2 md:p-4 border-t bg-background sticky bottom-0 z-20">
-        <div className="flex gap-2 items-start">
-            <ShadInput
-                value={workThemeInput}
-                onChange={(e) => setWorkThemeInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!isLoading) handleInitiateFullProcess();}}}
-                placeholder="Digite o tema principal do seu trabalho acadêmico aqui..."
-                disabled={isLoading}
-                className="flex-1 rounded-lg px-4 py-2 focus-visible:ring-primary text-sm"
-                aria-label="Input do tema do trabalho"
-            />
-            <Button
-                type="button"
-                onClick={() => handleInitiateFullProcess()}
-                disabled={isLoading || !workThemeInput.trim()}
-                size="icon"
-                className="rounded-full bg-primary hover:bg-primary/90 disabled:bg-muted flex-shrink-0 mt-1"
-                aria-label="Iniciar processo de criação do trabalho"
-            >
-                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <SendHorizontal className="h-5 w-5" />}
-            </Button>
+        <div className="p-2 md:p-4 border-t bg-background sticky bottom-0 z-20">
+          <div className="flex gap-2 items-start">
+              <ShadInput
+                  value={workThemeInput}
+                  onChange={(e) => setWorkThemeInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!isLoading) handleInitiateFullProcess();}}}
+                  placeholder="Digite o tema principal do seu trabalho acadêmico aqui..."
+                  disabled={isLoading}
+                  className="flex-1 rounded-lg px-4 py-2 focus-visible:ring-primary text-sm"
+                  aria-label="Input do tema do trabalho"
+              />
+              <Button
+                  type="button"
+                  onClick={() => handleInitiateFullProcess()}
+                  disabled={isLoading || !workThemeInput.trim()}
+                  size="icon"
+                  className="rounded-full bg-primary hover:bg-primary/90 disabled:bg-muted flex-shrink-0 mt-1"
+                  aria-label="Iniciar processo de criação do trabalho"
+              >
+                  {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <SendHorizontal className="h-5 w-5" />}
+              </Button>
+          </div>
         </div>
       </div>
+      
+      {generatedIndex.length > 0 && !isLoading && (
+        <aside className="w-60 border-l bg-card hidden md:flex flex-col">
+          <div className="p-4 border-b">
+            <h3 className="font-semibold text-base text-primary flex items-center gap-2">
+              <List className="h-5 w-5"/>
+              Índice do Trabalho
+            </h3>
+          </div>
+          <ScrollArea className="flex-1">
+            <nav className="p-2">
+              <ul>
+                {generatedIndex.map((title) => (
+                  <li key={title}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start text-left h-auto py-1.5 px-2 font-normal text-sm"
+                      onClick={() => scrollToSection(title)}
+                    >
+                      {title}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </ScrollArea>
+        </aside>
+      )}
     </div>
   );
 }
