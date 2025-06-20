@@ -76,6 +76,9 @@
 }
 
 @layer base {
+  html {
+    @apply overflow-hidden;
+  }
   * {
     @apply border-border;
   }
