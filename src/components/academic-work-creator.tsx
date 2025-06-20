@@ -14,7 +14,6 @@ import type { SearchResult, PageContent, ImagemConteudo } from "@/utils/raspagem
 import type { DetectTopicFromTextOutput } from "@/ai/flows/detect-topic-flow";
 import type { FichaLeitura } from "@/types";
 import type { GenerateIndexOutput } from "@/ai/flows/generate-index-flow";
-import type { GenerateBibliographyOutput } from "@/ai/flows/generate-bibliography-flow";
 import type { GenerateAcademicResponseOutput } from '@/ai/flows/generate-academic-response-flow';
 import { BookMarked } from 'lucide-react';
 
@@ -381,97 +380,81 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
         let sectionContent = "";
         try {
             const sectionTitleLower = sectionTitle.toLowerCase();
-            let apiResponse;
+            let prosePrompt = "";
+            let contextForProse: string | undefined = undefined;
+            let imageInfoForProse: string | undefined = undefined;
+
+            const formattedFichas = researchedFichas.map((f, idx) =>
+                `Ficha ${idx+1}: Título: ${f.titulo}\nAutor: ${f.autor || 'N/A'}\nAno: ${f.anoPublicacao || 's.d.'}\nResumo: ${f.resumo}\nCitações: ${(f.citacoesRelevantes || [f.citacao || 'N/A']).join('; ')}\nURL: ${f.url}`
+            ).join("\n\n---\n\n");
 
             if (sectionTitleLower.includes("referências") || sectionTitleLower.includes("bibliografia")) {
-                const fichasForBiblio = researchedFichas.map(f => ({
-                    url: f.url,
-                    titulo: f.titulo,
-                    autor: f.autor,
-                    anoPublicacao: f.anoPublicacao || 's.d.',
-                    palavrasChave: f.palavrasChave || [],
-                }));
-                 apiResponse = await fetch('/api/generate-bibliography', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ fichasDeLeitura: fichasForBiblio, citationStyle, targetLanguage })
-                });
-                if (!apiResponse.ok) { const err = await apiResponse.json(); throw new Error(err.details || err.error || "Erro desconhecido ao gerar bibliografia"); }
-                const result: GenerateBibliographyOutput = await apiResponse.json();
-                sectionContent = result.bibliography;
-            } else {
-                let prosePrompt = "";
-                let contextForProse = "";
-                let imageInfoForProse: string | undefined = undefined;
+                prosePrompt = `Com base nas informações de origem fornecidas no contexto, gere a seção '${sectionTitle}'. Formate cada entrada de acordo com o estilo de citação ${citationStyle} e liste-as em ordem alfabética. O idioma é ${targetLanguage}.`;
+                contextForProse = formattedFichas;
+            } else if (sectionTitleLower.includes("introdução")) {
+                prosePrompt = `Escreva a INTRODUÇÃO para um trabalho com o tema principal "${finalThemeForWriting}". A estrutura planejada do trabalho (índice) é: ${tempGeneratedIndexTitles.join(', ')}. Contextualize o tema, apresente sua relevância, o objetivo geral do trabalho e descreva brevemente a estrutura que será seguida. Use um tom formal e acadêmico. O idioma é ${targetLanguage} e o estilo de citação é ${citationStyle}.`;
+                if (formattedFichas) {
+                    contextForProse = `Considere as seguintes fichas de leitura como material de base, se relevante para a introdução:\n${formattedFichas}`;
+                }
+            } else if (sectionTitleLower.includes("conclusão")) {
+                const introContent = tempDevelopedSections.find(s => s.title.toLowerCase().includes("introdução"))?.content;
+                const coreSectionsContent = tempDevelopedSections
+                    .filter(s => !s.title.toLowerCase().includes("introdução") && !s.title.toLowerCase().includes("conclusão") && !s.title.toLowerCase().includes("referências") && !s.title.toLowerCase().includes("bibliografia"))
+                    .map(s => `Seção: ${s.title}\n${(s.content || "").substring(0, 500)}...`)
+                    .join("\n\n---\n\n");
+                prosePrompt = `Escreva a CONCLUSÃO para um trabalho com o tema principal "${finalThemeForWriting}". A introdução (se disponível) foi: "${introContent || 'Não fornecida'}". As seções desenvolvidas (resumidas) foram: "${coreSectionsContent || 'Não fornecidas'}". Retome brevemente o tema principal, sumarize as principais descobertas ou argumentos, apresente reflexões finais e, opcionalmente, sugira limitações ou caminhos para pesquisas futuras. Use um tom formal e acadêmico. O idioma é ${targetLanguage} e o estilo de citação é ${citationStyle}.`;
+            } else { // Development section
+                prosePrompt = `Desenvolva o conteúdo para a seção intitulada "${sectionTitle}" de um trabalho sobre "${finalThemeForWriting}". O idioma é ${targetLanguage} e o estilo de citação é ${citationStyle}.`;
+                if (formattedFichas) {
+                     prosePrompt += ` Baseie-se PRINCIPALMENTE nas seguintes fichas de leitura, integrando as informações de forma coesa e citando as fontes quando utilizá-las.`;
+                     contextForProse = formattedFichas;
 
-                const formattedFichas = researchedFichas.map((f, idx) =>
-                    `Ficha ${idx+1}: Título: ${f.titulo}\nAutor: ${f.autor || 'N/A'}\nAno: ${f.anoPublicacao || 's.d.'}\nResumo: ${f.resumo}\nCitações: ${(f.citacoesRelevantes || [f.citacao || 'N/A']).join('; ')}\nURL: ${f.url}`
-                ).join("\n\n---\n\n");
-
-                prosePrompt = `Você é um assistente acadêmico. O idioma é ${targetLanguage} e o estilo de citação é ${citationStyle}. Sua resposta DEVE começar com o título da seção apropriado formatado como um cabeçalho Markdown de nível 2 (ex: "## Introdução").`;
-                if (sectionTitleLower.includes("introdução")) {
-                    prosePrompt += ` Escreva a INTRODUÇÃO para um trabalho com o tema principal "${finalThemeForWriting}". A estrutura planejada do trabalho (índice) é: ${tempGeneratedIndexTitles.join(', ')}. Contextualize o tema, apresente sua relevância, o objetivo geral do trabalho e descreva brevemente a estrutura que será seguida. Use um tom formal e acadêmico.`;
-                    if (formattedFichas) {
-                        contextForProse = `Considere as seguintes fichas de leitura como material de base, se relevante para a introdução:\n${formattedFichas}`;
-                    }
-                } else if (sectionTitleLower.includes("conclusão")) {
-                    const introContent = tempDevelopedSections.find(s => s.title.toLowerCase().includes("introdução"))?.content;
-                    const coreSectionsContent = tempDevelopedSections
-                        .filter(s => !s.title.toLowerCase().includes("introdução") && !s.title.toLowerCase().includes("conclusão") && !s.title.toLowerCase().includes("referências") && !s.title.toLowerCase().includes("bibliografia"))
-                        .map(s => `Seção: ${s.title}\n${(s.content || "").substring(0, 500)}...`)
-                        .join("\n\n---\n\n");
-                    prosePrompt += ` Escreva a CONCLUSÃO para um trabalho com o tema principal "${finalThemeForWriting}". A introdução (se disponível) foi: "${introContent || 'Não fornecida'}". As seções desenvolvidas (resumidas) foram: "${coreSectionsContent || 'Não fornecidas'}". Retome brevemente o tema principal, sumarize as principais descobertas ou argumentos, apresente reflexões finais e, opcionalmente, sugira limitações ou caminhos para pesquisas futuras. Use um tom formal e acadêmico.`;
+                     const imagesFromFichas: string[] = [];
+                     researchedFichas.forEach(ficha => {
+                        if (ficha.imagens && ficha.imagens.length > 0) {
+                            ficha.imagens.forEach((img: ImagemConteudo) => {
+                                imagesFromFichas.push(`${img.legenda || ficha.titulo} (${img.src})`);
+                            });
+                        }
+                     });
+                     if (imagesFromFichas.length > 0) {
+                        imageInfoForProse = `Imagens de contexto: ${imagesFromFichas.join('; ')}`;
+                     }
                 } else {
-                    prosePrompt += ` Desenvolva o conteúdo para a seção intitulada "${sectionTitle}" de um trabalho sobre "${finalThemeForWriting}".`;
-                    if (formattedFichas) {
-                         prosePrompt += ` Baseie-se PRINCIPALMENTE nas seguintes fichas de leitura, integrando as informações de forma coesa e citando as fontes quando utilizá-las:\n${formattedFichas}`;
-
-                         const imagesFromFichas: string[] = [];
-                         researchedFichas.forEach(ficha => {
-                            if (ficha.imagens && ficha.imagens.length > 0) {
-                                ficha.imagens.forEach((img: ImagemConteudo) => {
-                                    imagesFromFichas.push(`${img.legenda || ficha.titulo} (${img.src})`);
-                                });
-                            }
-                         });
-                         if (imagesFromFichas.length > 0) {
-                            imageInfoForProse = `Imagens de contexto: ${imagesFromFichas.join('; ')}`;
-                         }
-
-                    } else {
-                        prosePrompt += " Baseie-se no seu conhecimento geral sobre o tema para desenvolver esta seção, pois não foram fornecidas fichas de leitura específicas.";
-                    }
-                    if (tempDevelopedSections.length > 0) {
-                        const previousSectionsSummary = tempDevelopedSections.map(s => `Seção Anterior: ${s.title}\n${(s.content || "").substring(0, 300)}...`).join("\n---\n");
-                        prosePrompt += `\n\nConsidere também o conteúdo das seções já escritas para manter a coerência e evitar repetições desnecessárias:\n${previousSectionsSummary}`;
-                    }
+                    prosePrompt += " Baseie-se no seu conhecimento geral sobre o tema para desenvolver esta seção, pois não foram fornecidas fichas de leitura específicas.";
                 }
-
-                const proseInput = {
-                    prompt: prosePrompt,
-                    contextContent: contextForProse || ( (sectionTitleLower.includes("desenvolvimento") || (!sectionTitleLower.includes("introdução") && !sectionTitleLower.includes("conclusão"))) && formattedFichas ? formattedFichas : undefined),
-                    imageInfo: imageInfoForProse,
-                    targetLanguage,
-                    citationStyle
-                };
-
-                apiResponse = await fetch('/api/generate-academic-prose', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(proseInput)
-                });
-                if (!apiResponse.ok) {
-                    const errText = await apiResponse.text();
-                    console.error("Erro API /generate-academic-prose:", errText);
-                    let err;
-                    try {
-                        err = JSON.parse(errText);
-                    } catch (parseError) {
-                        err = { error: "Erro desconhecido ao gerar conteúdo", details: errText.substring(0, 200) };
-                    }
-                    throw new Error(err.details || err.error || `Erro desconhecido ao gerar conteúdo para "${sectionTitle}"`);
+                if (tempDevelopedSections.length > 0) {
+                    const previousSectionsSummary = tempDevelopedSections.map(s => `Seção Anterior: ${s.title}\n${(s.content || "").substring(0, 300)}...`).join("\n---\n");
+                    prosePrompt += `\n\nConsidere também o conteúdo das seções já escritas para manter a coerência e evitar repetições desnecessárias:\n${previousSectionsSummary}`;
                 }
-                const result: GenerateAcademicResponseOutput = await apiResponse.json();
-                sectionContent = result.response;
             }
+
+            const proseInput = {
+                prompt: prosePrompt,
+                contextContent: contextForProse,
+                imageInfo: imageInfoForProse,
+                targetLanguage,
+                citationStyle
+            };
+
+            const apiResponse = await fetch('/api/generate-academic-prose', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(proseInput)
+            });
+            if (!apiResponse.ok) {
+                const errText = await apiResponse.text();
+                console.error("Erro API /generate-academic-prose:", errText);
+                let err;
+                try {
+                    err = JSON.parse(errText);
+                } catch (parseError) {
+                    err = { error: "Erro desconhecido ao gerar conteúdo", details: errText.substring(0, 200) };
+                }
+                throw new Error(err.details || err.error || `Erro desconhecido ao gerar conteúdo para "${sectionTitle}"`);
+            }
+            const result: GenerateAcademicResponseOutput = await apiResponse.json();
+            sectionContent = result.response;
+
         } catch (error: any) {
             tempAddWritingLog(`❌ Erro ao gerar conteúdo para "${sectionTitle}": ${error.message || String(error)}. Usando placeholder.`);
             sectionContent = `## ${sectionTitle}\n\nConteúdo para "${sectionTitle}" não pôde ser gerado devido a um erro. Por favor, tente novamente ou edite manualmente.`;
@@ -481,11 +464,7 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
         tempDevelopedSections.push(currentSection);
         setDevelopedSections([...tempDevelopedSections]);
         
-        if (sectionTitle.toLowerCase().includes("referências") || sectionTitle.toLowerCase().includes("bibliografia")) {
-            tempFullText += `## ${sectionTitle}\n\n${sectionContent}\n\n`;
-        } else {
-            tempFullText += `${sectionContent}\n\n`;
-        }
+        tempFullText += `${sectionContent}\n\n`;
         
         setGeneratedFullText(tempFullText);
         tempAddWritingLog(`✅ Seção "${sectionTitle}" escrita.`);
@@ -729,11 +708,7 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
                       />
                    </div>
                   <div className="markdown-container prose-sm max-w-none mt-1">
-                    {developedSections.map((section) => (
-                      <div key={section.title} >
-                        <MarkdownWithCode content={section.content} />
-                      </div>
-                    ))}
+                    <MarkdownWithCode content={generatedFullText || ''} />
                   </div>
               </div>
             )}

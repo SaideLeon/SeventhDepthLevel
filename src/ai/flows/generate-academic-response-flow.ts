@@ -35,7 +35,7 @@ export type FichaLeituraForGenkitContext = z.infer<typeof FichaLeituraInputSchem
 
 
 const GenerateAcademicResponseInputSchema = z.object({
-  prompt: z.string().describe('The prompt to send to the AI. This should clearly state the academic task (e.g., "Write an introduction for...", "Develop the section titled \'X\' using the provided context...", "Write the conclusion for...").'),
+  prompt: z.string().describe('The prompt to send to the AI. This should clearly state the academic task (e.g., "Write an introduction for...", "Develop the section titled \'X\' using the provided context...", "Write the conclusion for...", "Generate the bibliography...").'),
   userImageInputDataUri: z.string().optional().describe("A Data URI of an image uploaded by the user with their prompt. Expected format: 'data:<mimetype>;base64,<encoded_data>'."),
   persona: z.string().optional().default("Cognick, seu assistente de estudos").describe('The persona the AI should adopt.'),
   rules: z.string().optional().describe('Specific rules the AI should follow when responding.'),
@@ -104,7 +104,7 @@ Ao gerar o texto, por favor, siga estas etapas meticulosamente:
     *   \`Pinto (2008) explica que a nova reforma só surgirá em 1982...\`
     **EVITE este estilo parentético para paráfrases e citações curtas como método principal:**
     *   \`No ciclo rápido, o carbono move-se rapidamente... (Castilho, s.d.).\`
-5.  **Referências Bibliográficas - OBRIGATÓRIO (SE O PROMPT FOR ESPECIFICAMENTE SOBRE GERAR REFERÊNCIAS)**: Se o prompt atual pedir explicitamente para gerar uma lista de referências (ex: "Gere a bibliografia baseada nestas fichas"), você **DEVE** incluir uma seção final intitulada 'Referências' (ou seu equivalente no idioma de destino). Liste todas as fontes únicas citadas, formatadas conforme APA 7ª edição. CASO CONTRÁRIO, se o prompt for para gerar introdução, seção ou conclusão, NÃO adicione uma lista de referências no final dessa parte específica.
+5.  **Referências Bibliográficas - OBRIGATÓRIO (SE O PROMPT FOR ESPECIFICAMENTE SOBRE GERAR REFERÊNCIAS)**: Se o prompt atual pedir explicitamente para gerar uma lista de referências (ex: "Gere a bibliografia baseada nestas fichas"), você **DEVE** iniciar sua resposta com o título \`## Referências Bibliográficas\` (ou um equivalente apropriado no idioma de destino) e, em seguida, listar todas as fontes únicas fornecidas no contexto, formatadas conforme o estilo de citação solicitado (ex: {{{citationStyle}}}). CASO CONTRÁRIO, se o prompt for para gerar introdução, seção ou conclusão, NÃO adicione uma lista de referências no final dessa parte específica.
 6.  **Saída Final**: A saída final deve ser uma única string Markdown.
 
 ---
@@ -135,9 +135,9 @@ Responda APENAS com o texto Markdown solicitado. Não adicione comentários ou e
 Se o prompt for para gerar uma INTRODUÇÃO, sua resposta DEVE começar com \`## Introdução\` seguido pelo conteúdo da introdução.
 Se o prompt for para gerar uma SEÇÃO específica (cujo título foi fornecido no prompt, por exemplo, 'Minha Seção'), sua resposta DEVE começar com \`## Minha Seção\` (usando o título exato fornecido) seguido pelo conteúdo da seção.
 Se o prompt for para gerar uma CONCLUSÃO, sua resposta DEVE começar com \`## Conclusão\` seguido pelo conteúdo da conclusão.
-Se o prompt for para gerar uma BIBLIOGRAFIA (o que este fluxo geralmente não faz, mas como regra geral), gere APENAS a lista de referências (o título "Referências" será adicionado externamente).
+Se o prompt for para gerar uma BIBLIOGRAFIA, sua resposta DEVE começar com \`## Referências Bibliográficas\` seguido pela lista de referências.
 Sua resposta deve ser EXCLUSIVAMENTE um objeto JSON válido, sem nenhum texto ou formatação Markdown antes ou depois dele.
-O objeto JSON deve ter uma única chave "response". O valor dessa chave será o conteúdo solicitado em formato Markdown, incluindo o título da seção conforme instruído acima (exceto para bibliografia).
+O objeto JSON deve ter uma única chave "response". O valor dessa chave será o conteúdo solicitado em formato Markdown, incluindo o título da seção conforme instruído acima.
 Exemplo de formato de saída JSON esperado para uma seção "Exemplo de Título":
 {
   "response": "## Exemplo de Título\\n\\nEste é o conteúdo Markdown gerado para a seção..."

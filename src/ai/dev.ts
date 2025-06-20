@@ -12,5 +12,5 @@ import '@/ai/flows/generate-index-flow.ts';
 // import '@/ai/flows/generate-introduction-flow.ts'; // Consolidado em generate-academic-response-flow
 // import '@/ai/flows/generate-academic-section-flow.ts'; // Consolidado em generate-academic-response-flow
 // import '@/ai/flows/generate-conclusion-flow.ts'; // Consolidado em generate-academic-response-flow
-import '@/ai/flows/generate-bibliography-flow.ts';
+// import '@/ai/flows/generate-bibliography-flow.ts'; // Consolidado em generate-academic-response-flow
     
