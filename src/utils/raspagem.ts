@@ -234,4 +234,4 @@ async function rasparConteudoPagina(url: string): Promise<PageContent> {
   }
 }
 
-export { rasparTodasPaginasBusca, rasparConteudoPagina };
+export { rasparTodasPaginasBusca, rasparConteudoPagina, type ImagemConteudo };
