@@ -184,21 +184,8 @@ export default function ChatInterface() {
 
   const handleStartNewAcademicWorkItem = useCallback(() => {
     const newWorkId = Date.now().toString();
-    const userInputTheme = prompt("Digite o tema principal do seu trabalho acadêmico:", "Novo Trabalho Acadêmico");
-    
-    let workTitle: string;
-    let workTheme: string;
-
-    if (userInputTheme === null) { // User cancelled the prompt
-        workTitle = `Novo Trabalho (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`;
-        workTheme = ""; 
-    } else if (userInputTheme.trim() === "") { // User entered nothing or only spaces
-        workTitle = "Novo Trabalho Acadêmico";
-        workTheme = "";
-    } else {
-        workTitle = userInputTheme;
-        workTheme = userInputTheme;
-    }
+    const workTitle = `Novo Trabalho (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`;
+    const workTheme = ""; // Theme is empty, user will input it in the creator component
     
     const newWork: AcademicWork = {
       id: newWorkId,
