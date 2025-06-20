@@ -700,7 +700,6 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
                         disabled={!generatedFullText || isLoading}
                     />
                  </div>
-                 <h3 className="font-semibold text-sm text-primary">Conteúdo Gerado:</h3>
                 <div className="markdown-container prose-sm max-w-none mt-1">
                     <MarkdownWithCode content={generatedFullText} />
                 </div>
