@@ -58,7 +58,8 @@ URL: {{url}}
 ---
 
 Instruções para a Bibliografia:
-- Para cada ficha, crie uma entrada de referência formatada.
+- **Sua resposta DEVE começar com o título "Referências" (ou um equivalente apropriado no idioma de destino, como "Referências Bibliográficas") formatado como um cabeçalho Markdown de nível 2 (por exemplo, \`## Referências\`).**
+- Abaixo do título, para cada ficha, crie uma entrada de referência formatada.
 - Siga as convenções gerais do estilo {{{citationStyle}}}. Por exemplo:
     - **APA:** Sobrenome, Iniciais. (Ano). *Título do trabalho*. URL
     - **ABNT (Brasil):** SOBRENOME, Nome. *Título do trabalho*. Local: Editora, Ano. Disponível em: <URL>. Acesso em: dia mês. ano. (Simplifique para apenas Autor, Ano, Título, URL se os detalhes de Local/Editora não estiverem nas fichas).
@@ -68,12 +69,11 @@ Instruções para a Bibliografia:
 - Cada referência deve ser um item de uma lista não ordenada em Markdown (usando '* ').
 
 Sua resposta DEVE ser EXCLUSIVAMENTE um objeto JSON válido, sem nenhum texto ou formatação Markdown antes ou depois dele.
-O objeto JSON deve ter uma única chave "bibliography". O valor dessa chave será a lista de referências em formato Markdown.
-Não inclua o título "Referências Bibliográficas" ou "Bibliografia" dentro do valor do campo "bibliography".
+O objeto JSON deve ter uma única chave "bibliography". O valor dessa chave será o conteúdo da seção de bibliografia, incluindo o título, em formato Markdown.
 
 Exemplo de formato de saída JSON esperado (para estilo APA simplificado):
 {
-  "bibliography": "* Autor, A. A. (Ano). *Título do trabalho*. URL\\n* Nome da Organização. (Ano). *Título do trabalho*. URL\\n* *Título do trabalho quando não há autor*. (Ano). URL"
+  "bibliography": "## Referências\\n\\n* Autor, A. A. (Ano). *Título do trabalho*. URL\\n* Nome da Organização. (Ano). *Título do trabalho*. URL\\n* *Título do trabalho quando não há autor*. (Ano). URL"
 }
 
 (Note que no exemplo JSON acima, \\n representa novas linhas no Markdown gerado.)
@@ -88,7 +88,7 @@ const generateBibliographyFlow = ai.defineFlow(
   },
   async (input) => {
     if (!input.fichasDeLeitura || input.fichasDeLeitura.length === 0) {
-      return { bibliography: "Nenhuma fonte fornecida para gerar a bibliografia." };
+      return { bibliography: "## Referências\n\nNenhuma fonte fornecida para gerar a bibliografia." };
     }
     const {output} = await bibliographyPrompt(input);
     if (
