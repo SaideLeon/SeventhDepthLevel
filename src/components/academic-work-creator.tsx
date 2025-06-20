@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input as ShadInput } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from "@/components/ui/progress";
-import { Loader2, SendHorizontal, Sparkles, BookCheck, FileText as FileTextLucideIcon } from 'lucide-react';
+import { Loader2, SendHorizontal, Sparkles, BookCheck, FileText as FileTextLucideIcon, FileText } from 'lucide-react';
 import MarkdownToDocx from '@/components/MarkdownToDocx';
 import { useToast } from "@/hooks/use-toast";
 import { MarkdownWithCode } from '@/components/Markdown/MarkdownWithCode';
@@ -46,10 +46,10 @@ interface AcademicWorkCreatorProps {
 }
 
 const SUGGESTION_THEMES = [
-    "O impacto da Inteligência Artificial na Educação em Moçambique",
-    "Desenvolvimento Sustentável e Gestão Ambiental em Quelimane",
-    "História da Luta de Libertação Nacional de Moçambique",
-    "Desafios da Saúde Pública no Contexto Rural Moçambicano"
+    "estudo de sistema digestivo",
+    "importancia da fotossintese na biodiversidade",
+    "História da segunda guerra mundial",
+    "Efeitos dos Tipos de Clima no Meio Ambiente e na Sociedade"
 ];
 
 
@@ -285,20 +285,20 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
 
         if(!fichamentoResponse.ok) {
             const errorData = await fichamentoResponse.json().catch(() => ({ error: "Erro desconhecido", details: "Não foi possível analisar a resposta de erro do servidor." }));
-            throw new Error(`Falha ao gerar ficha (Groq): ${errorData.details || errorData.error || fichamentoResponse.statusText}`);
+            throw new Error(`Falha ao gerar ficha ${errorData.details || errorData.error || fichamentoResponse.statusText}`);
         }
         const fichaGerada: FichaLeitura = await fichamentoResponse.json();
 
         fetchedFichas.push(fichaGerada);
         setResearchedFichas(prev => [...prev, fichaGerada]);
-        tempAddResearchLog(`✅ Ficha (Groq) para "${fichaGerada.titulo.substring(0,50)}..." criada.`);
+        tempAddResearchLog(`✅ Ficha para "${fichaGerada.titulo.substring(0,50)}..." criada.`);
 
       } catch (error: any) {
         tempAddResearchLog(`❌ Erro ao processar artigo "${article.titulo.substring(0,50)}...": ${error.message}`);
       }
     }
 
-    tempAddResearchLog(`📚 Fichamento (Groq) concluído. ${fetchedFichas.length} fichas geradas.`);
+    tempAddResearchLog(`📚 Fichamento concluído. ${fetchedFichas.length} fichas geradas.`);
     if (activeWork) {
         onUpdateWork({ ...activeWork, fichas: fetchedFichas, researchLog: currentResearchLogs, lastUpdatedAt: Date.now() });
     }
@@ -369,7 +369,7 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
         onUpdateWork({ ...activeWork, generatedIndex: tempGeneratedIndexTitles, writingLog: currentWritingLogs, lastUpdatedAt: Date.now() });
     }
 
-    let tempFullText = ""; // Não adicionar o título principal aqui
+    let tempFullText = "";
     const tempDevelopedSections: AcademicWorkSection[] = developedSections.length > 0 ? [...developedSections] : [];
 
     for (let i = 0; i < tempGeneratedIndexTitles.length; i++) {
@@ -397,7 +397,7 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
                 });
                 if (!apiResponse.ok) { const err = await apiResponse.json(); throw new Error(err.details || err.error || "Erro desconhecido ao gerar bibliografia"); }
                 const result: GenerateBibliographyOutput = await apiResponse.json();
-                sectionContent = result.bibliography; // IA já inclui o título "## Referências"
+                sectionContent = result.bibliography;
             } else {
                 let prosePrompt = "";
                 let contextForProse = "";
@@ -469,19 +469,17 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
                     throw new Error(err.details || err.error || `Erro desconhecido ao gerar conteúdo para "${sectionTitle}"`);
                 }
                 const result: GenerateAcademicResponseOutput = await apiResponse.json();
-                sectionContent = result.response; // IA já inclui o título "## Nome da Seção"
+                sectionContent = result.response;
             }
         } catch (error: any) {
             tempAddWritingLog(`❌ Erro ao gerar conteúdo para "${sectionTitle}": ${error.message || String(error)}. Usando placeholder.`);
-            // A IA deve retornar o título, então o placeholder aqui não precisa do título.
-            sectionContent = `Conteúdo para "${sectionTitle}" não pôde ser gerado devido a um erro. Por favor, tente novamente ou edite manualmente.`;
+            sectionContent = `## ${sectionTitle}\n\nConteúdo para "${sectionTitle}" não pôde ser gerado devido a um erro. Por favor, tente novamente ou edite manualmente.`;
         }
 
         const currentSection: AcademicWorkSection = { title: sectionTitle, content: sectionContent };
         tempDevelopedSections.push(currentSection);
         setDevelopedSections([...tempDevelopedSections]);
 
-        // A IA já inclui o título da seção (##), exceto para bibliografia, que o frontend adicionará
         if (sectionTitle.toLowerCase().includes("referências") || sectionTitle.toLowerCase().includes("bibliografia")) {
             tempFullText += `## ${sectionTitle}\n\n${sectionContent}\n\n`;
         } else {
@@ -694,18 +692,16 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
 
           {generatedFullText && activeWork && (
             <div className="p-2 border rounded-md bg-card shadow-sm">
-                 <h1 className="text-xl font-bold text-center text-primary mb-4 mt-2 markdown-container prose-headings:my-1 prose-headings:text-lg">
-                    {activeWork.title || workThemeInput || "Trabalho Acadêmico"}
-                 </h1>
                  <div className="flex justify-between items-center mb-2 sticky top-0 bg-card/80 backdrop-blur-sm py-1 z-10">
-                    <h3 className="font-semibold text-sm text-primary">Conteúdo Gerado:</h3>
+                    <h2 className="font-bold text-lg text-primary">{activeWork.title || workThemeInput || "Trabalho Acadêmico"}</h2>
                     <MarkdownToDocx
-                        markdownContent={`# ${activeWork.title || workThemeInput || "Trabalho Acadêmico"}\n\n${generatedFullText}`}
+                        markdownContent={generatedFullText}
                         fileName={`Cognick_Trabalho_${(activeWork?.title || workThemeInput || 'Academico').replace(/\s+/g, '_').substring(0,30)}`}
                         disabled={!generatedFullText || isLoading}
                     />
                  </div>
-                <div className="markdown-container prose-sm max-w-none">
+                 <h3 className="font-semibold text-sm text-primary">Conteúdo Gerado:</h3>
+                <div className="markdown-container prose-sm max-w-none mt-1">
                     <MarkdownWithCode content={generatedFullText} />
                 </div>
             </div>
@@ -740,3 +736,4 @@ export default function AcademicWorkCreator({ activeWork, onUpdateWork }: Academ
   );
 }
 
+    
