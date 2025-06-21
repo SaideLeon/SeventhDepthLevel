@@ -51,13 +51,14 @@ export async function POST(req: NextRequest) {
     const docChildren: (Paragraph | Table | any)[] = [];
 
     let currentParagraphRuns: TextRun[] = [];
-    let currentHeadingStyleId: string | undefined = undefined; // Stores style ID like "Heading1"
+    let currentHeadingStyleId: string | undefined = undefined;
     let isInsideList = false;
     let listLevel = 0;
     let inTable = false;
     let tableRows: TableRow[] = [];
     let currentRowCells: Paragraph[][] = [];
     let isInsideBlockquote = false;
+    let addPageBreakBeforeNextPara = false;
 
     const headingStyleMap: { [key: string]: string } = {
       'h1': "Heading1", 'h2': "Heading2",
@@ -70,11 +71,16 @@ export async function POST(req: NextRequest) {
         const paragraphConfig: any = {
           children: [...currentParagraphRuns],
         };
+
+        if (addPageBreakBeforeNextPara) {
+          paragraphConfig.pageBreakBefore = true;
+          addPageBreakBeforeNextPara = false;
+        }
+        
         if (currentHeadingStyleId) {
           paragraphConfig.style = currentHeadingStyleId;
         } else if (isInsideList) {
           paragraphConfig.bullet = { level: listLevel };
-          // Styling (font, size, alignment, spacing) for lists is handled by numbering configuration
         } else if (isInsideBlockquote) {
           paragraphConfig.style = "BlockquoteStyle";
         } else {
@@ -86,10 +92,33 @@ export async function POST(req: NextRequest) {
       }
     };
 
-    for (const token of tokens) {
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+
       switch (token.type) {
         case 'heading_open':
           flushParagraph();
+
+          const nextToken = tokens[i + 1];
+          if (nextToken && nextToken.type === 'inline' && nextToken.content) {
+            const headingText = nextToken.content.trim().toLowerCase();
+            const pageBreakSections = [
+              'resumo',
+              'lista de abreviaturas e siglas',
+              'introdução',
+              'metodologia',
+              'conclusão',
+              'referências bibliográficas',
+              'referencias bibliograficas'
+            ];
+            
+            const normalizedHeading = headingText.replace(/^[\d.\s]*/, '');
+            
+            if (pageBreakSections.includes(normalizedHeading)) {
+                addPageBreakBeforeNextPara = true;
+            }
+          }
+          
           currentHeadingStyleId = headingStyleMap[token.tag] || "Heading3";
           break;
 
@@ -104,7 +133,7 @@ export async function POST(req: NextRequest) {
         case 'inline':
           if (token.children) {
             for (const child of token.children) {
-              let textRunOptions: any = {font: "Times New Roman", size: 24}; // Default to TNR 12pt
+              let textRunOptions: any = {font: "Times New Roman", size: 24};
 
               if (child.type === 'text') {
                 textRunOptions.text = child.content;
@@ -124,7 +153,6 @@ export async function POST(req: NextRequest) {
                 }
               } else if (child.type === 'code_inline') {
                  textRunOptions.text = child.content;
-                 // Font and size already set to TNR 12pt by default for textRunOptions
               }
               else if (child.type === 'image') {
                 flushParagraph();
@@ -148,7 +176,7 @@ export async function POST(req: NextRequest) {
                         }));
                         if (alt) {
                             docChildren.push(new Paragraph({
-                              children: [new TextRun({ text: alt })], // TextRun content will be styled by ImageCaption
+                              children: [new TextRun({ text: alt })],
                               style: "ImageCaption",
                             }));
                         }
@@ -173,7 +201,7 @@ export async function POST(req: NextRequest) {
                     k++;
                 }
                 textRunOptions.text = linkText || href;
-                textRunOptions.style = "Hyperlink"; // Character style
+                textRunOptions.style = "Hyperlink";
 
                 if (k < token.children.length) token.children.splice(token.children.indexOf(child) + 1, k - (token.children.indexOf(child)));
 
@@ -182,7 +210,6 @@ export async function POST(req: NextRequest) {
               }
 
               if(textRunOptions.text || textRunOptions.break){
-                // Ensure explicit font for Hyperlink style character runs if needed, though DefaultParagraphFont should pick it up
                 if (textRunOptions.style === "Hyperlink") {
                      currentParagraphRuns.push(new TextRun({...textRunOptions, font: "Times New Roman", size: 24}));
                 } else {
@@ -213,7 +240,7 @@ export async function POST(req: NextRequest) {
         case 'fence':
           flushParagraph();
           docChildren.push(new Paragraph({
-            children: [new TextRun({ text: token.content })], // Text will be styled by CodeBlockStyle
+            children: [new TextRun({ text: token.content })],
             style: "CodeBlockStyle",
           }));
           break;
@@ -283,7 +310,7 @@ export async function POST(req: NextRequest) {
           break;
         case 'th_close':
         case 'td_close':
-          flushParagraph(); // This will create paragraph with "Normal" style by default
+          flushParagraph(); 
           if (docChildren.length > 0 && docChildren[docChildren.length -1] instanceof Paragraph) {
              const cellPara = docChildren.pop() as Paragraph;
              currentRowCells.push([cellPara]);
@@ -302,10 +329,10 @@ export async function POST(req: NextRequest) {
     const doc = new Document({
       sections: [{ children: docChildren }],
       styles: {
-        default: { // Document defaults
+        default: {
           paragraph: {
-            run: { font: "Times New Roman", size: 24 }, // 12pt
-            spacing: { line: 360, after: 120 }, // 1.5 line spacing (12pt * 1.5 * 20 = 360), 6pt after
+            run: { font: "Times New Roman", size: 24 }, 
+            spacing: { line: 360, after: 120 },
             alignment: AlignmentType.JUSTIFIED,
           },
         },
@@ -313,7 +340,7 @@ export async function POST(req: NextRequest) {
           {
             id: "Normal",
             name: "Normal",
-            basedOn: "Normal", // Based on document default
+            basedOn: "Normal",
             quickFormat: true,
             run: { font: "Times New Roman", size: 24 },
             paragraph: {
@@ -324,13 +351,13 @@ export async function POST(req: NextRequest) {
           {
             id: "Heading1",
             name: "Heading 1",
-            basedOn: "Normal", // Will inherit TNR 12pt
+            basedOn: "Normal", 
             next: "Normal",
             quickFormat: true,
-            run: { bold: true }, // Keep bold, font/size from basedOn or default
+            run: { bold: true },
             paragraph: {
               alignment: AlignmentType.CENTER,
-              spacing: { before: 240, after: 120, line: 360 }, // TNR 12pt, 1.5 line spacing
+              spacing: { before: 240, after: 120, line: 360 },
             },
           },
           {
@@ -396,32 +423,32 @@ export async function POST(req: NextRequest) {
           {
             id: "CodeBlockStyle",
             name: "Code Block Style",
-            basedOn: "Normal", // Inherits TNR 12pt
-            run: {}, // No specific run override, so uses Normal's run
+            basedOn: "Normal",
+            run: {},
             paragraph: {
-              alignment: AlignmentType.LEFT, // Not justified for code
-              spacing: { line: 240, after: 120 }, // Single line spacing
-              shading: { type: ShadingType.CLEAR, fill: "F0F0F0" }, // Keep shading
+              alignment: AlignmentType.LEFT,
+              spacing: { line: 240, after: 120 },
+              shading: { type: ShadingType.CLEAR, fill: "F0F0F0" },
             },
           },
           {
             id: "BlockquoteStyle",
             name: "Blockquote Style",
-            basedOn: "Normal", // Inherits TNR 12pt, Justified, 1.5 spacing
-            run: { italics: true }, // Add italics
+            basedOn: "Normal",
+            run: { italics: true },
             paragraph: {
-              indent: {left: 720}, // Keep indent
-              spacing: { after: 60 }, // Adjust after spacing
+              indent: {left: 720},
+              spacing: { after: 60 },
             },
           },
           {
             id: "ImageCaption",
             name: "Image Caption",
-            basedOn: "Normal", // Inherits TNR 12pt, Justified, 1.5 spacing
-            run: { size: 18, italics: true, font: "Times New Roman" }, // Override to 9pt italic TNR
+            basedOn: "Normal",
+            run: { size: 18, italics: true, font: "Times New Roman" },
             paragraph: {
-              alignment: AlignmentType.CENTER, // Center captions
-              spacing: { line: 240, after: 60 }, // Single line spacing for captions
+              alignment: AlignmentType.CENTER,
+              spacing: { line: 240, after: 60 },
             },
           },
         ],
@@ -429,8 +456,8 @@ export async function POST(req: NextRequest) {
             {
               id: "Hyperlink",
               name: "Hyperlink",
-              basedOn: "DefaultParagraphFont", // Will inherit TNR and 12pt from paragraph's run
-              run: { color: "0563C1", underline: {}, font: "Times New Roman", size: 24 }, // Explicitly set font here too
+              basedOn: "DefaultParagraphFont",
+              run: { color: "0563C1", underline: {}, font: "Times New Roman", size: 24 },
             }
         ]
       },
@@ -442,9 +469,9 @@ export async function POST(req: NextRequest) {
             style: {
               paragraph: {
                 indent: { left: 720, hanging: 360 },
-                spacing: { line: 360, after: 60 }, // 1.5 line, 3pt after
+                spacing: { line: 360, after: 60 },
                 alignment: AlignmentType.JUSTIFIED,
-                run: { font: "Times New Roman", size: 24 }, // TNR 12pt
+                run: { font: "Times New Roman", size: 24 },
               }
             }
           },{
@@ -478,5 +505,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Falha ao gerar o arquivo DOCX.', details: errorMessage }, { status: 500 });
   }
 }
-
-    
