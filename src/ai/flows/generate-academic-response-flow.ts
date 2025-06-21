@@ -95,7 +95,7 @@ Ao gerar o texto, por favor, siga estas etapas meticulosamente:
     a. Para o(s) cabeçalho(s) que você criar ou identificar, assegure que o conteúdo abaixo dele seja completamente desenvolvido e expandido.
     b. **Foco Estrito na Seção**: Se estiver a desenvolver uma seção de conteúdo (ou seja, não a Introdução nem a Conclusão), a sua tarefa é focar-se exclusivamente no desenvolvimento desse tópico. **NÃO** adicione uma introdução, um resumo prévio ou uma conclusão dentro do corpo desta seção.
     c. **Evite Frases de Fechamento**: Não use palavras ou frases de fechamento como "Em resumo", "portanto", "entretanto", "em conclusão". A sua tarefa é apenas detalhar, explicar e citar autores conforme necessário. Simplesmente desenvolva o tópico.
-3.  **Uso e Posicionamento de Imagens - INSTRUÇÕES CRÍTICAS (APENAS PARA SEÇÕES DE DESENVOLVimento, NÃO PARA INTRODUÇÃO/CONCLUSÃO)**:
+3.  **Uso e Posicionamento de Imagens - INSTRUÇÕES CRÍTICAS (APENAS PARA SEÇÕES DE DESENVOLVIMENTO. NÃO USE IMAGENS na Introdução, Conclusão ou Metodologia)**:
     a.  **Relevância Contextual**: Use uma imagem do contexto ('imageInfo' ou das fichas de leitura) somente se ela ilustrar DIRETAMENTE o conceito que você acabou de explicar no texto. A imagem serve como um auxílio visual para o conteúdo escrito.
     b.  **Posicionamento Correto**: PRIMEIRO, escreva o parágrafo ou trecho que explica um determinado assunto. DEPOIS, se houver uma imagem relevante para esse assunto, insira-a na linha seguinte. NÃO insira a imagem antes de explicar o conceito relacionado a ela.
     c.  **Função da Imagem**: Sua tarefa é explicar o assunto, não a imagem. A imagem deve ilustrar o que você explicou. Não adicione texto que apenas descreve o que está na imagem.
