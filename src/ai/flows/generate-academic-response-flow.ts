@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -90,24 +89,28 @@ Mensagens anteriores (da mais antiga relevante para a mais recente antes da perg
 A saída deve ser formatada em Markdown.
 Ao gerar o texto, por favor, siga estas etapas meticulosamente:
 1.  **Estrutura e Cabeçalhos**:
-    a.  **Título Principal da Seção**: Se o prompt atual pedir para você gerar o conteúdo para UMA seção específica (ex: "Desenvolva a seção 'Título da Seção X'...", "Escreva a introdução para...", "Escreva a conclusão para..."), você **DEVE** iniciar sua resposta com o título principal dessa seção formatado como um cabeçalho Markdown de nível 2 (por exemplo, \`## Introdução\`, \`## Título da Seção X\`, \`## Conclusão\`).
+    a.  **Título Principal da Seção**: Se o prompt atual pedir para você gerar o conteúdo para UMA seção específica (ex: "Desenvolva a seção 'Título da Seção X'...", "Escreva a introdução para...", "Escreva a conclusão para..."), você **DEVE** iniciar sua resposta com o título principal dessa seção formatado como um cabeçalho Markdown de nível 2 (por exemplo, '## Introdução', '## Título da Seção X', '## Conclusão').
     b.  **Sub-cabeçalhos**: Você pode usar sub-cabeçalhos (ex: ### Subtítulo, #### Outro Subtítulo) dentro do conteúdo da seção que está gerando, se for apropriado para organizar o texto abaixo do título principal.
 2.  **Desenvolvimento do Conteúdo**:
     a. Para o(s) cabeçalho(s) que você criar ou identificar, assegure que o conteúdo abaixo dele seja completamente desenvolvido e expandido.
     b. **Foco Estrito na Seção**: Se estiver a desenvolver uma seção de conteúdo (ou seja, não a Introdução nem a Conclusão), a sua tarefa é focar-se exclusivamente no desenvolvimento desse tópico. **NÃO** adicione uma introdução, um resumo prévio ou uma conclusão dentro do corpo desta seção.
     c. **Evite Frases de Fechamento**: Não use palavras ou frases de fechamento como "Em resumo", "portanto", "entretanto", "em conclusão". A sua tarefa é apenas detalhar, explicar e citar autores conforme necessário. Simplesmente desenvolva o tópico.
-3.  **Colocação e Formatação de Imagens - INSTRUÇÕES CRÍTICAS (APENAS PARA SEÇÕES DE DESENVOLVIMENTO, NÃO PARA INTRODUÇÃO/CONCLUSÃO)**:
-    a.  **Condição**: Se estiver desenvolvendo uma seção principal (NÃO uma introdução ou conclusão) e se imagens forem fornecidas no contexto (via \`imageInfo\` OU dentro do \`contextContent\` que representa fichas de leitura), e você determinar que uma imagem é diretamente relevante para um cabeçalho ou subcabeçalho específico que você está gerando, você **DEVE** inserir essa imagem usando o formato Markdown (\`![texto alternativo](URL)\`) imediatamente **ABAIXO** desse cabeçalho relevante.
-    b.  **Texto Alternativo**: Use a legenda original da imagem (disponível na string \`imageInfo\` ou na ficha de leitura) como o texto alternativo no Markdown.
-    c.  **Formatação de URL - ABSOLUTAMENTE CRÍTICO**: Para TODAS as imagens, você **DEVE** garantir que nenhum parâmetro de URL (como '?width=50&blur=10', '?size=small', etc.) seja incluído na URL de origem da imagem dentro do Markdown. SEMPRE use apenas a URL base da imagem.
+3.  **Uso e Posicionamento de Imagens - INSTRUÇÕES CRÍTICAS (APENAS PARA SEÇÕES DE DESENVOLVimento, NÃO PARA INTRODUÇÃO/CONCLUSÃO)**:
+    a.  **Relevância Contextual**: Use uma imagem do contexto ('imageInfo' ou das fichas de leitura) somente se ela ilustrar DIRETAMENTE o conceito que você acabou de explicar no texto. A imagem serve como um auxílio visual para o conteúdo escrito.
+    b.  **Posicionamento Correto**: PRIMEIRO, escreva o parágrafo ou trecho que explica um determinado assunto. DEPOIS, se houver uma imagem relevante para esse assunto, insira-a na linha seguinte. NÃO insira a imagem antes de explicar o conceito relacionado a ela.
+    c.  **Função da Imagem**: Sua tarefa é explicar o assunto, não a imagem. A imagem deve ilustrar o que você explicou. Não adicione texto que apenas descreve o que está na imagem.
+    d.  **Não Agrupar Imagens**: NÃO insira várias imagens seguidas sem texto explicativo entre elas. Cada imagem deve estar associada a um trecho de texto que a contextualiza.
+    e.  **Formato Markdown**: Insira a imagem usando o formato Markdown: '![texto alternativo](URL)'.
+    f.  **Texto Alternativo**: Use a legenda original da imagem (disponível em 'imageInfo' ou na ficha de leitura) como o "texto alternativo".
+    g.  **Formatação de URL - CRÍTICO**: Para TODAS as imagens, você DEVE garantir que nenhum parâmetro de URL (como '?width=50', '?size=small') seja incluído na URL de origem da imagem. Use sempre a URL base.
 4.  **Estilo de Citação - INSTRUÇÃO CRÍTICA: VOCÊ DEVE PRIORIZAR CITAÇÕES NARRATIVAS.**
-    Ao citar fontes (informações de \`contextContent\`), use primariamente um **estilo narrativo**, integrando o nome do autor diretamente na frase (ex: "Segundo Autor (data)...", "De acordo com Autor (data)..."). Siga as diretrizes da APA 7ª edição (autor-data, número de página para citações diretas).
+    Ao citar fontes (informações de 'contextContent'), use primariamente um **estilo narrativo**, integrando o nome do autor diretamente na frase (ex: "Segundo Autor (data)...", "De acordo com Autor (data)..."). Siga as diretrizes da APA 7ª edição (autor-data, número de página para citações diretas).
     **Exemplo do Estilo Narrativo PREFERIDO:**
-    *   \`Segundo Castilho (s.d.), no ciclo rápido, o carbono move-se rapidamente...\`
-    *   \`Pinto (2008) explica que a nova reforma só surgirá em 1982...\`
+    *   'Segundo Castilho (s.d.), no ciclo rápido, o carbono move-se rapidamente...'
+    *   'Pinto (2008) explica que a nova reforma só surgirá em 1982...'
     **EVITE este estilo parentético para paráfrases e citações curtas como método principal:**
-    *   \`No ciclo rápido, o carbono move-se rapidamente... (Castilho, s.d.).\`
-5.  **Referências Bibliográficas - OBRIGATÓRIO (SE O PROMPT FOR ESPECIFICAMENTE SOBRE GERAR REFERÊNCIAS)**: Se o prompt atual pedir explicitamente para gerar uma lista de referências (ex: "Gere a bibliografia baseada nestas fichas"), você **DEVE** iniciar sua resposta com o título \`## Referências Bibliográficas\` (ou um equivalente apropriado no idioma de destino) e, em seguida, listar todas as fontes únicas fornecidas no contexto, formatadas conforme o estilo de citação solicitado (ex: {{{citationStyle}}}). CASO CONTRÁRIO, se o prompt for para gerar introdução, seção ou conclusão, NÃO adicione uma lista de referências no final dessa parte específica.
+    *   'No ciclo rápido, o carbono move-se rapidamente... (Castilho, s.d.).'
+5.  **Referências Bibliográficas - OBRIGATÓRIO (SE O PROMPT FOR ESPECIFICAMENTE SOBRE GERAR REFERÊNCIAS)**: Se o prompt atual pedir explicitamente para gerar uma lista de referências (ex: "Gere a bibliografia baseada nestas fichas"), você **DEVE** iniciar sua resposta com o título '## Referências Bibliográficas' (ou um equivalente apropriado no idioma de destino) e, em seguida, listar todas as fontes únicas fornecidas no contexto, formatadas conforme o estilo de citação solicitado (ex: {{{citationStyle}}}). CASO CONTRÁRIO, se o prompt for para gerar introdução, seção ou conclusão, NÃO adicione uma lista de referências no final dessa parte específica.
 6.  **Saída Final**: A saída final deve ser uma única string Markdown.
 
 ---
@@ -135,10 +138,10 @@ O usuário também forneceu a seguinte imagem diretamente com sua pergunta atual
 Tarefa/prompt atual do usuário: {{{prompt}}}
 
 Responda APENAS com o texto Markdown solicitado. Não adicione comentários ou explicações sobre o que você está fazendo, a menos que o prompt peça explicitamente.
-Se o prompt for para gerar uma INTRODUÇÃO, sua resposta DEVE começar com \`## Introdução\` seguido pelo conteúdo da introdução.
-Se o prompt for para gerar uma SEÇÃO específica (cujo título foi fornecido no prompt, por exemplo, 'Minha Seção'), sua resposta DEVE começar com \`## Minha Seção\` (usando o título exato fornecido) seguido pelo conteúdo da seção.
-Se o prompt for para gerar uma CONCLUSÃO, sua resposta DEVE começar com \`## Conclusão\` seguido pelo conteúdo da conclusão.
-Se o prompt for para gerar uma BIBLIOGRAFIA, sua resposta DEVE começar com \`## Referências Bibliográficas\` seguido pela lista de referências.
+Se o prompt for para gerar uma INTRODUÇÃO, sua resposta DEVE começar com '## Introdução' seguido pelo conteúdo da introdução.
+Se o prompt for para gerar uma SEÇÃO específica (cujo título foi fornecido no prompt, por exemplo, 'Minha Seção'), sua resposta DEVE começar com '## Minha Seção' (usando o título exato fornecido) seguido pelo conteúdo da seção.
+Se o prompt for para gerar uma CONCLUSÃO, sua resposta DEVE começar com '## Conclusão' seguido pelo conteúdo da conclusão.
+Se o prompt for para gerar uma BIBLIOGRAFIA, sua resposta DEVE começar com '## Referências Bibliográficas' seguido pela lista de referências.
 Sua resposta deve ser EXCLUSIVAMENTE um objeto JSON válido, sem nenhum texto ou formatação Markdown antes ou depois dele.
 O objeto JSON deve ter uma única chave "response". O valor dessa chave será o conteúdo solicitado em formato Markdown, incluindo o título da seção conforme instruído acima.
 Exemplo de formato de saída JSON esperado para uma seção "Exemplo de Título":
